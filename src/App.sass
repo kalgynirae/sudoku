@@ -8,8 +8,12 @@ body
 .square
   border: solid 1px #505050
   text-align: center
-  font-size: 2em
-  line-height: 5rem
+
+  .number
+    font-size: 2.5em
+
+  .corner
+    font-size: 0.8em
 
 .square.selected
   background-color: #00a0e010
@@ -40,9 +44,12 @@ body
   background-color: #053910
   border: solid 1px #004000
   color: #e0e0e0
-  font-size: 3em
+  font-size: 1.5em
   padding: 0.2em 0.5em
   margin: 1px
 
   &.active
     border: solid 1px #008000
+
+  &.large
+    font-size: 2.5em

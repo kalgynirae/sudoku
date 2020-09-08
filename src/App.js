@@ -19,7 +19,9 @@ function ButtonRow(props) {
 function Button(props) {
   return (
     <button
-      className={`button ${props.active ? "active" : ""}`}
+      className={`button ${props.active ? "active" : ""} ${
+        props.large ? "large" : ""
+      }`}
       onClick={props.onClick}
     >
       {props.children}
@@ -28,47 +30,120 @@ function Button(props) {
 }
 
 function Square(props) {
+  let inner = null;
+  if (props.number !== null) {
+    inner = <span className="number">{props.number}</span>;
+  } else {
+    inner = (
+      <>
+        <span className="corner">{props.corner}</span>
+        <span className="center">{props.center}</span>
+      </>
+    );
+  }
   return (
     <div
       className={`square ${props.selected ? "selected" : ""}`}
       data-index={props.index}
     >
-      {props.value}
+      {inner}
     </div>
   );
 }
 
+const EMPTY_ARRAY = new Array(81).fill(null);
+const EMPTY_ARRAY_OF_SETS = new Array(81).fill(new Set());
+const EMPTY_GAME_STATE = {
+  numbers: EMPTY_ARRAY,
+  corners: EMPTY_ARRAY_OF_SETS,
+  centers: EMPTY_ARRAY_OF_SETS,
+};
+const EMPTY_SET = new Set();
+
 function App() {
-  const is_selecting = useRef(false);
   const [mode, setMode] = useState(Mode.normal);
-  const [numbers, setNumbers] = useState(new Array(81).fill(null));
-  const [selection, setSelection] = useState(new Set());
+  const [gameState, setGameState] = useState(EMPTY_GAME_STATE);
+  const [selection, setSelection] = useState(EMPTY_SET);
 
   const clearSelection = useCallback(() => {
     setSelection(new Set());
-  }, [setSelection]);
+  }, []);
 
-  const selectSquare = useCallback(
-    (i) => {
-      console.log(`selectSquare(${i})`);
-      setSelection((selection) => {
-        const newSelection = new Set(selection);
-        newSelection.add(i);
-        return newSelection;
+  const selectSquare = useCallback((i) => {
+    console.log(`selectSquare(${i})`);
+    setSelection((selection) => {
+      const newSelection = new Set(selection);
+      newSelection.add(i);
+      return newSelection;
+    });
+  }, []);
+
+  const inputDigit = useCallback(
+    (digit) => {
+      console.log(`inputDigit(${digit})`);
+      setGameState((gameState) => {
+        const newState = { ...gameState };
+        switch (mode) {
+          case Mode.normal:
+            newState.numbers = newState.numbers.slice();
+            for (let i of selection) {
+              newState.numbers[i] = digit;
+            }
+            break;
+          case Mode.corner:
+            newState.corners = newState.corners.slice();
+            let adding = true;
+            if (digit !== null) {
+              for (let i of selection) {
+                if (newState.corners[i].has(digit)) {
+                  adding = false;
+                  break;
+                }
+              }
+            }
+            for (let i of selection) {
+              newState.corners[i] = new Set(newState.corners[i]);
+              if (digit !== null) {
+                if (adding) {
+                  newState.corners[i].add(digit);
+                } else {
+                  newState.corners[i].delete(digit);
+                }
+              } else {
+                newState.corners[i] = new Set();
+              }
+            }
+            break;
+          case Mode.center:
+            newState.centers = newState.centers.slice();
+            adding = true;
+            if (digit !== null) {
+              for (let i of selection) {
+                if (newState.centers[i].has(digit)) {
+                  adding = false;
+                  break;
+                }
+              }
+            }
+            for (let i of selection) {
+              newState.centers[i] = new Set(newState.centers[i]);
+              if (digit !== null) {
+                if (adding) {
+                  newState.centers[i].add(digit);
+                } else {
+                  newState.centers[i].delete(digit);
+                }
+              } else {
+                newState.centers[i] = new Set();
+              }
+            }
+            break;
+          default:
+        }
+        return newState;
       });
     },
-    [setSelection]
-  );
-
-  const writeDigit = useCallback(
-    (digit) => {
-      const newNumbers = numbers.slice();
-      for (let item of selection) {
-        newNumbers[item] = digit;
-      }
-      setNumbers(newNumbers);
-    },
-    [numbers, selection]
+    [mode, selection]
   );
 
   //
@@ -108,7 +183,6 @@ function App() {
   //
   // MOUSE
   //
-  function handleButton(i) {}
 
   //
   // KEYBOARD
@@ -122,9 +196,9 @@ function App() {
       if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(digit)) {
         return;
       }
-      writeDigit(digit);
+      inputDigit(digit);
     },
-    [selection.size, writeDigit]
+    [selection.size, inputDigit]
   );
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
@@ -138,7 +212,15 @@ function App() {
   //
   function renderSquare(ibox, isquare) {
     const i = indexbox(ibox, isquare);
-    return <Square index={i} selected={selection.has(i)} value={numbers[i]} />;
+    return (
+      <Square
+        index={i}
+        selected={selection.has(i)}
+        number={gameState.numbers[i]}
+        corner={gameState.corners[i]}
+        center={gameState.centers[i]}
+      />
+    );
   }
 
   function renderBox(i) {
@@ -202,15 +284,40 @@ function App() {
         </Button>
       </ButtonRow>
       <ButtonRow label="input">
-        <Button onClick={() => handleButton(1)}>1</Button>
-        <Button onClick={() => handleButton(2)}>2</Button>
-        <Button onClick={() => handleButton(3)}>3</Button>
-        <Button onClick={() => handleButton(4)}>4</Button>
-        <Button onClick={() => handleButton(5)}>5</Button>
-        <Button onClick={() => handleButton(6)}>6</Button>
-        <Button onClick={() => handleButton(7)}>7</Button>
-        <Button onClick={() => handleButton(8)}>8</Button>
-        <Button onClick={() => handleButton(9)}>9</Button>
+        <Button large onClick={() => inputDigit(1)}>
+          1
+        </Button>
+        <Button large onClick={() => inputDigit(2)}>
+          2
+        </Button>
+        <Button large onClick={() => inputDigit(3)}>
+          3
+        </Button>
+        <Button large onClick={() => inputDigit(4)}>
+          4
+        </Button>
+        <Button large onClick={() => inputDigit(5)}>
+          5
+        </Button>
+        <Button large onClick={() => inputDigit(6)}>
+          6
+        </Button>
+        <Button large onClick={() => inputDigit(7)}>
+          7
+        </Button>
+        <Button large onClick={() => inputDigit(8)}>
+          8
+        </Button>
+        <Button large onClick={() => inputDigit(9)}>
+          9
+        </Button>
+        <Button large onClick={() => inputDigit(null)}>
+          ⌫
+        </Button>
+      </ButtonRow>
+      <ButtonRow label="tools">
+        <Button>undo</Button>
+        <Button>redo</Button>
       </ButtonRow>
     </>
   );

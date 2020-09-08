@@ -1,0 +1,48 @@
+body
+  background-color: #232729
+  color: #d1d2d0
+
+.title
+  text-align: center
+
+.square
+  border: solid 1px #505050
+  text-align: center
+  font-size: 2em
+  line-height: 5rem
+
+.square.selected
+  background-color: #00a0e010
+  //border: solid 1px #00a0e0
+  box-shadow: 0 0 8px #00a0e060
+
+.box
+  border: solid 2px #606060
+  display: grid
+  grid-template-columns: repeat(3, 4rem)
+  grid-template-rows: repeat(3, 4rem)
+  user-select: none
+
+.board
+  background-color: #32393c
+  display: grid
+  grid-template-columns: repeat(3, 12rem)
+  grid-template-rows: repeat(3, 12rem)
+  height: 36rem
+  width: 36rem
+  margin: 1rem auto
+
+.button-row
+  display: flex
+  justify-content: center
+
+.button
+  background-color: #053910
+  border: solid 1px #004000
+  color: #e0e0e0
+  font-size: 3em
+  padding: 0.2em 0.5em
+  margin: 1px
+
+  &.active
+    border: solid 1px #008000

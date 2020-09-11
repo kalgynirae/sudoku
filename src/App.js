@@ -1,4 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  EMPTY_GAME_STATE,
+  EMPTY_SET,
+  addCenter,
+  addCorner,
+  anyContains,
+  removeCenter,
+  removeCorner,
+  setNumber,
+} from "./Gamestate.js";
 import "./App.sass";
 
 const Mode = {
@@ -51,18 +61,9 @@ function Square(props) {
   );
 }
 
-const EMPTY_ARRAY = new Array(81).fill(null);
-const EMPTY_ARRAY_OF_SETS = new Array(81).fill(new Set());
-const EMPTY_GAME_STATE = {
-  numbers: EMPTY_ARRAY,
-  corners: EMPTY_ARRAY_OF_SETS,
-  centers: EMPTY_ARRAY_OF_SETS,
-};
-const EMPTY_SET = new Set();
-
 function App() {
   const [mode, setMode] = useState(Mode.normal);
-  const [gameState, setGameState] = useState(EMPTY_GAME_STATE);
+  const [gamestate, setGamestate] = useState(EMPTY_GAME_STATE);
   const [selection, setSelection] = useState(EMPTY_SET);
 
   const clearSelection = useCallback(() => {
@@ -81,66 +82,25 @@ function App() {
   const inputDigit = useCallback(
     (digit) => {
       console.log(`inputDigit(${digit})`);
-      setGameState((gameState) => {
-        const newState = { ...gameState };
+      setGamestate((gamestate) => {
         switch (mode) {
           case Mode.normal:
-            newState.numbers = newState.numbers.slice();
-            for (let i of selection) {
-              newState.numbers[i] = digit;
-            }
-            break;
+            return setNumber(gamestate, selection, digit);
           case Mode.corner:
-            newState.corners = newState.corners.slice();
-            let adding = true;
-            if (digit !== null) {
-              for (let i of selection) {
-                if (newState.corners[i].has(digit)) {
-                  adding = false;
-                  break;
-                }
-              }
+            if (anyContains(gamestate.corners, selection, digit)) {
+              return removeCorner(gamestate, selection, digit);
+            } else {
+              return addCorner(gamestate, selection, digit);
             }
-            for (let i of selection) {
-              newState.corners[i] = new Set(newState.corners[i]);
-              if (digit !== null) {
-                if (adding) {
-                  newState.corners[i].add(digit);
-                } else {
-                  newState.corners[i].delete(digit);
-                }
-              } else {
-                newState.corners[i] = new Set();
-              }
-            }
-            break;
           case Mode.center:
-            newState.centers = newState.centers.slice();
-            adding = true;
-            if (digit !== null) {
-              for (let i of selection) {
-                if (newState.centers[i].has(digit)) {
-                  adding = false;
-                  break;
-                }
-              }
+            if (anyContains(gamestate.centers, selection, digit)) {
+              return removeCenter(gamestate, selection, digit);
+            } else {
+              return addCenter(gamestate, selection, digit);
             }
-            for (let i of selection) {
-              newState.centers[i] = new Set(newState.centers[i]);
-              if (digit !== null) {
-                if (adding) {
-                  newState.centers[i].add(digit);
-                } else {
-                  newState.centers[i].delete(digit);
-                }
-              } else {
-                newState.centers[i] = new Set();
-              }
-            }
-            break;
           default:
+            return "this is not what the gamestate should be";
         }
-        return newState;
       });
     },
     [mode, selection]
@@ -152,9 +112,15 @@ function App() {
   const selectTouchedSquares = useCallback(
     (e) => {
       for (let touch of e.changedTouches) {
-        let square = document.elementFromPoint(touch.pageX, touch.pageY);
-        let i = parseInt(square.getAttribute("data-index"));
-        selectSquare(i);
+        let element = document.elementFromPoint(touch.pageX, touch.pageY);
+        while (element !== null) {
+          if (element.hasAttribute("data-index")) break;
+          element = element.parentElement;
+        }
+        if (element != null) {
+          let i = parseInt(element.getAttribute("data-index"));
+          selectSquare(i);
+        }
       }
     },
     [selectSquare]
@@ -216,9 +182,9 @@ function App() {
       <Square
         index={i}
         selected={selection.has(i)}
-        number={gameState.numbers[i]}
-        corner={gameState.corners[i]}
-        center={gameState.centers[i]}
+        number={gamestate.numbers[i]}
+        corner={gamestate.corners[i]}
+        center={gamestate.centers[i]}
       />
     );
   }

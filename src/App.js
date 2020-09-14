@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   EMPTY_GAME_STATE,
-  EMPTY_SET,
   addCenter,
   addCorner,
   anyContains,
@@ -9,6 +8,7 @@ import {
   removeCorner,
   setNumber,
 } from "./Gamestate.js";
+import { squareAt, indexbox, neighbor } from "./Geometry.js";
 import "./App.sass";
 
 const Mode = {
@@ -53,7 +53,9 @@ function Square(props) {
   }
   return (
     <div
-      className={`square ${props.selected ? "selected" : ""}`}
+      className={`square ${props.selected ? "selected" : ""} ${
+        props.cursor ? "cursor" : ""
+      }`}
       data-index={props.index}
     >
       {inner}
@@ -64,39 +66,75 @@ function Square(props) {
 function App() {
   const [mode, setMode] = useState(Mode.normal);
   const [gamestate, setGamestate] = useState(EMPTY_GAME_STATE);
-  const [selection, setSelection] = useState(EMPTY_SET);
+  const [selection, setSelection] = useState({ squares: [], cursor: null });
 
+  //
+  // SELECTION
+  //
   const clearSelection = useCallback(() => {
-    setSelection(new Set());
+    setSelection((selection) => {
+      const newSelection = { ...selection };
+      newSelection.squares = [];
+      return newSelection;
+    });
   }, []);
 
   const selectSquare = useCallback((i) => {
     console.log(`selectSquare(${i})`);
     setSelection((selection) => {
-      const newSelection = new Set(selection);
-      newSelection.add(i);
+      const newSelection = { ...selection };
+      newSelection.squares = [...selection.squares];
+      newSelection.squares.push(i);
+      newSelection.cursor = i;
       return newSelection;
     });
   }, []);
 
+  const selectSquareAtCoordinates = useCallback(
+    (x, y) => {
+      console.log(`selectSquareAtCoordinates(${x}, ${y})`);
+      const i = squareAt(x, y);
+      if (i !== null) {
+        selectSquare(i);
+      }
+    },
+    [selectSquare]
+  );
+
+  const selectDirection = useCallback(
+    (direction) => {
+      setSelection((selection) => {
+        let i = neighbor(selection.cursor, direction) ?? selection.cursor;
+        const newSelection = { ...selection };
+        newSelection.squares = [...selection.squares, i];
+        newSelection.cursor = i;
+        return newSelection;
+      });
+    },
+    [setSelection]
+  );
+
+  //
+  // ACTIONS
+  //
   const inputDigit = useCallback(
     (digit) => {
       console.log(`inputDigit(${digit})`);
       setGamestate((gamestate) => {
         switch (mode) {
           case Mode.normal:
-            return setNumber(gamestate, selection, digit);
+            return setNumber(gamestate, selection.squares, digit);
           case Mode.corner:
-            if (anyContains(gamestate.corners, selection, digit)) {
-              return removeCorner(gamestate, selection, digit);
+            if (anyContains(gamestate.corners, selection.squares, digit)) {
+              return removeCorner(gamestate, selection.squares, digit);
             } else {
-              return addCorner(gamestate, selection, digit);
+              return addCorner(gamestate, selection.squares, digit);
             }
           case Mode.center:
-            if (anyContains(gamestate.centers, selection, digit)) {
-              return removeCenter(gamestate, selection, digit);
+            if (anyContains(gamestate.centers, selection.squares, digit)) {
+              return removeCenter(gamestate, selection.squares, digit);
             } else {
-              return addCenter(gamestate, selection, digit);
+              return addCenter(gamestate, selection.squares, digit);
             }
           default:
             return "this is not what the gamestate should be";
@@ -112,18 +150,10 @@ function App() {
   const selectTouchedSquares = useCallback(
     (e) => {
       for (let touch of e.changedTouches) {
-        let element = document.elementFromPoint(touch.pageX, touch.pageY);
-        while (element !== null) {
-          if (element.hasAttribute("data-index")) break;
-          element = element.parentElement;
-        }
-        if (element != null) {
-          let i = parseInt(element.getAttribute("data-index"));
-          selectSquare(i);
-        }
+        selectSquareAtCoordinates(touch.pageX, touch.pageY);
       }
     },
-    [selectSquare]
+    [selectSquareAtCoordinates]
   );
 
   const handleTouchMove = useCallback(
@@ -149,22 +179,69 @@ function App() {
   //
   // MOUSE
   //
+  const handleMouseDown = useCallback(
+    (e) => {
+      console.log(`handleMouseDown()`);
+      if (!e.ctrlKey && !e.shiftKey) {
+        clearSelection();
+      }
+      selectSquareAtCoordinates(e.pageX, e.pageY);
+    },
+    [clearSelection, selectSquareAtCoordinates]
+  );
+
+  const handleMouseMove = useCallback(
+    (e) => {
+      console.log(`handleMouseMove()`);
+      if (e.buttons === 1) {
+        selectSquareAtCoordinates(e.pageX, e.pageY);
+      }
+    },
+    [selectSquareAtCoordinates]
+  );
 
   //
   // KEYBOARD
   //
+  const moveCursor = useCallback(
+    (e) => {
+      if (!e.shiftKey && !e.ctrlKey) {
+        clearSelection();
+      }
+      selectDirection(e.key.substring(5).toLowerCase());
+    },
+    [clearSelection, selectDirection]
+  );
   const handleKeyDown = useCallback(
     (e) => {
-      if (selection.size === 0 || !"123456789".includes(e.key)) {
-        return;
+      switch (e.key) {
+        case "Escape":
+          clearSelection();
+          break;
+        case "ArrowRight":
+        case "ArrowLeft":
+        case "ArrowUp":
+        case "ArrowDown":
+          moveCursor(e);
+          break;
+        case "1":
+        case "2":
+        case "3":
+        case "4":
+        case "5":
+        case "6":
+        case "7":
+        case "8":
+        case "9":
+          inputDigit(Number(e.key).valueOf());
+          break;
+        default:
+          console.log(`Unhandled keydown: ${e}`);
+          return;
       }
-      const digit = Number(e.key).valueOf();
-      if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(digit)) {
-        return;
-      }
-      inputDigit(digit);
+      e.preventDefault();
     },
-    [selection.size, inputDigit]
+    [clearSelection, inputDigit, moveCursor]
   );
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
@@ -181,7 +258,8 @@ function App() {
     return (
       <Square
         index={i}
-        selected={selection.has(i)}
+        cursor={selection.cursor === i}
+        selected={selection.squares.includes(i)}
         number={gamestate.numbers[i]}
         corner={gamestate.corners[i]}
         center={gamestate.centers[i]}
@@ -208,13 +286,17 @@ function App() {
   const board = useRef(null);
   useEffect(() => {
     const node = board.current;
+    node.addEventListener("mousedown", handleMouseDown);
+    node.addEventListener("mousemove", handleMouseMove);
     node.addEventListener("touchmove", handleTouchMove);
     node.addEventListener("touchstart", handleTouchStart);
     return () => {
+      node.removeEventListener("mousedown", handleMouseDown);
+      node.removeEventListener("mousemove", handleMouseMove);
       node.removeEventListener("touchmove", handleTouchMove);
       node.removeEventListener("touchstart", handleTouchStart);
     };
-  }, [handleTouchMove, handleTouchStart]);
+  }, [handleMouseDown, handleMouseMove, handleTouchMove, handleTouchStart]);
 
   return (
     <>
@@ -287,14 +369,6 @@ function App() {
       </ButtonRow>
     </>
   );
-}
-
-function indexbox(ibox, isquare) {
-  const boxrow = Math.floor(ibox / 3);
-  const boxcol = ibox % 3;
-  const actualrow = boxrow * 3 + Math.floor(isquare / 3);
-  const actualcol = boxcol * 3 + (isquare % 3);
-  return actualrow * 9 + actualcol;
 }
 
 export default App;

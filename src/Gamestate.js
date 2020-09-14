@@ -3,27 +3,26 @@ export const EMPTY_GAME_STATE = {
   corners: new Array(81).fill(new Set()),
   centers: new Array(81).fill(new Set()),
 };
-export const EMPTY_SET = new Set();
 
-export function anyContains(substate, selection, digit) {
-  for (let i of selection) {
+export function anyContains(substate, squares, digit) {
+  for (let i of squares) {
     if (substate[i].has(digit)) return true;
   }
   return false;
 }
 
-export function setNumber(state, selection, digit) {
+export function setNumber(state, squares, digit) {
   const newstate = { ...state };
   newstate.numbers = [...state.numbers];
-  for (let i of selection) {
+  for (let i of squares) {
     newstate.numbers[i] = digit;
   }
   return newstate;
 }
 
-export function addHint(substate, selection, digit) {
+export function addHint(substate, squares, digit) {
   const newsubstate = [...substate];
-  for (let i of selection) {
+  for (let i of squares) {
     if (!substate[i].has(digit)) {
       newsubstate[i] = new Set(substate[i]);
       newsubstate[i].add(digit);
@@ -32,9 +31,9 @@ export function addHint(substate, selection, digit) {
   return newsubstate;
 }
 
-export function removeHint(substate, selection, digit) {
+export function removeHint(substate, squares, digit) {
   const newsubstate = [...substate];
-  for (let i of selection) {
+  for (let i of squares) {
     if (substate[i].has(digit)) {
       newsubstate[i] = new Set(substate[i]);
       newsubstate[i].delete(digit);
@@ -43,26 +42,26 @@ export function removeHint(substate, selection, digit) {
   return newsubstate;
 }
 
-export function addCorner(state, selection, digit) {
+export function addCorner(state, squares, digit) {
   const newstate = { ...state };
-  newstate.corners = addHint(state.corners, selection, digit);
+  newstate.corners = addHint(state.corners, squares, digit);
   return newstate;
 }
 
-export function removeCorner(state, selection, digit) {
+export function removeCorner(state, squares, digit) {
   const newstate = { ...state };
-  newstate.corners = removeHint(state.corners, selection, digit);
+  newstate.corners = removeHint(state.corners, squares, digit);
   return newstate;
 }
 
-export function addCenter(state, selection, digit) {
+export function addCenter(state, squares, digit) {
   const newstate = { ...state };
-  newstate.centers = addHint(state.centers, selection, digit);
+  newstate.centers = addHint(state.centers, squares, digit);
   return newstate;
 }
 
-export function removeCenter(state, selection, digit) {
+export function removeCenter(state, squares, digit) {
   const newstate = { ...state };
-  newstate.centers = removeHint(state.centers, selection, digit);
+  newstate.centers = removeHint(state.centers, squares, digit);
   return newstate;
 }

@@ -6,7 +6,7 @@ body
   text-align: center
 
 .square
-  border: solid 1px #505050
+  background-color: #32393c
   text-align: center
 
   .number
@@ -15,25 +15,29 @@ body
   .corner
     font-size: 0.8em
 
-.square.selected
-  background-color: #00a0e010
-  //border: solid 1px #00a0e0
-  box-shadow: 0 0 8px #00a0e060
+  &.selected
+    background-color: mix(#32393c, #00a0e0, 90%)
+
+  &.cursor
+    border: solid 1px #00a0e0
 
 .box
-  border: solid 2px #606060
+  column-gap: 1px
+  row-gap: 1px
   display: grid
   grid-template-columns: repeat(3, 4rem)
   grid-template-rows: repeat(3, 4rem)
   user-select: none
+  padding: 5px
 
 .board
-  background-color: #32393c
+  column-gap: 3px
+  row-gap: 3px
   display: grid
-  grid-template-columns: repeat(3, 12rem)
-  grid-template-rows: repeat(3, 12rem)
-  height: 36rem
-  width: 36rem
+  grid-template-columns: repeat(3, calc(12rem + 2px))
+  grid-template-rows: repeat(3, calc(12rem + 2px))
+  height: calc(36rem + 12px)
+  width: calc(36rem + 12px)
   margin: 1rem auto
 
 .button-row

@@ -20,7 +20,7 @@ export function setNumber(state, squares, digit) {
   return newstate;
 }
 
-export function addHint(substate, squares, digit) {
+export function _addHint(substate, squares, digit) {
   const newsubstate = [...substate];
   for (let i of squares) {
     if (!substate[i].has(digit)) {
@@ -31,7 +31,7 @@ export function addHint(substate, squares, digit) {
   return newsubstate;
 }
 
-export function removeHint(substate, squares, digit) {
+export function _removeHint(substate, squares, digit) {
   const newsubstate = [...substate];
   for (let i of squares) {
     if (substate[i].has(digit)) {
@@ -44,24 +44,24 @@ export function removeHint(substate, squares, digit) {
 
 export function addCorner(state, squares, digit) {
   const newstate = { ...state };
-  newstate.corners = addHint(state.corners, squares, digit);
+  newstate.corners = _addHint(state.corners, squares, digit);
   return newstate;
 }
 
 export function removeCorner(state, squares, digit) {
   const newstate = { ...state };
-  newstate.corners = removeHint(state.corners, squares, digit);
+  newstate.corners = _removeHint(state.corners, squares, digit);
   return newstate;
 }
 
 export function addCenter(state, squares, digit) {
   const newstate = { ...state };
-  newstate.centers = addHint(state.centers, squares, digit);
+  newstate.centers = _addHint(state.centers, squares, digit);
   return newstate;
 }
 
 export function removeCenter(state, squares, digit) {
   const newstate = { ...state };
-  newstate.centers = removeHint(state.centers, squares, digit);
+  newstate.centers = _removeHint(state.centers, squares, digit);
   return newstate;
 }

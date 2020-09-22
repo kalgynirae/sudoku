@@ -32,6 +32,7 @@ function Button(props) {
       className={`button ${props.active ? "active" : ""} ${
         props.large ? "large" : ""
       }`}
+      disabled={props.enabled === false}
       onClick={props.onClick}
     >
       {props.children}
@@ -65,8 +66,50 @@ function Square(props) {
 
 function App() {
   const [mode, setMode] = useState(Mode.normal);
-  const [gamestate, setGamestate] = useState(EMPTY_GAME_STATE);
+  const [gamestate, _setGamestate] = useState({
+    stack: [EMPTY_GAME_STATE],
+    index: 0,
+  });
   const [selection, setSelection] = useState({ squares: [], cursor: null });
+
+  //
+  // STATE
+  //
+  const currentState = gamestate.stack[gamestate.index];
+
+  const pushState = useCallback((newstatefunc) => {
+    _setGamestate((gamestate) => {
+      const newState = newstatefunc(gamestate.stack[gamestate.index]);
+      const newStack = gamestate.stack.slice(0, gamestate.index + 1);
+      newStack.push(newState);
+      const newGamestate = { stack: newStack, index: gamestate.index + 1 };
+      return newGamestate;
+    });
+  }, []);
+
+  const undo = useCallback(() => {
+    _setGamestate((gamestate) => {
+      if (gamestate.index === 0) {
+        return gamestate;
+      }
+      return {
+        stack: gamestate.stack,
+        index: gamestate.index - 1,
+      };
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    _setGamestate((gamestate) => {
+      if (gamestate.index === gamestate.stack.length - 1) {
+        return gamestate;
+      }
+      return {
+        stack: gamestate.stack,
+        index: gamestate.index + 1,
+      };
+    });
+  }, []);
 
   //
   // SELECTION
@@ -120,7 +163,7 @@ function App() {
   const inputDigit = useCallback(
     (digit) => {
       console.log(`inputDigit(${digit})`);
-      setGamestate((gamestate) => {
+      pushState((gamestate) => {
         switch (mode) {
           case Mode.normal:
             return setNumber(gamestate, selection.squares, digit);
@@ -141,7 +184,7 @@ function App() {
         }
       });
     },
-    [mode, selection]
+    [pushState, mode, selection]
   );
 
   //
@@ -260,9 +303,9 @@ function App() {
         index={i}
         cursor={selection.cursor === i}
         selected={selection.squares.includes(i)}
-        number={gamestate.numbers[i]}
-        corner={gamestate.corners[i]}
-        center={gamestate.centers[i]}
+        number={currentState.numbers[i]}
+        corner={currentState.corners[i]}
+        center={currentState.centers[i]}
       />
     );
   }
@@ -364,8 +407,15 @@ function App() {
         </Button>
       </ButtonRow>
       <ButtonRow label="tools">
-        <Button>undo</Button>
-        <Button>redo</Button>
+        <Button onClick={() => undo()} enabled={gamestate.index > 0}>
+          undo
+        </Button>
+        <Button
+          onClick={() => redo()}
+          enabled={gamestate.index < gamestate.stack.length - 1}
+        >
+          redo
+        </Button>
       </ButtonRow>
     </>
   );

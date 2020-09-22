@@ -1,3 +1,8 @@
+html
+  --square-gap: 1px
+  --box-gap: 3px
+  --square-size: 4rem
+
 body
   background-color: #232729
   color: #d1d2d0
@@ -7,10 +12,16 @@ body
 
 .square
   background-color: #32393c
+  position: relative
   text-align: center
 
   .number
-    font-size: 2.5em
+    font-size: 2.4em
+    position: absolute
+    margin: 0
+    left: 0%
+    top: 50%
+    transform: translate(0, -50%)
 
   .corner
     font-size: 0.8em
@@ -22,22 +33,22 @@ body
     border: solid 1px #00a0e0
 
 .box
-  column-gap: 1px
-  row-gap: 1px
+  column-gap: var(--square-gap)
+  row-gap: var(--square-gap)
   display: grid
-  grid-template-columns: repeat(3, 4rem)
-  grid-template-rows: repeat(3, 4rem)
+  grid-template-columns: repeat(3, var(--square-size))
+  grid-template-rows: repeat(3, var(--square-size))
   user-select: none
   padding: 5px
 
 .board
-  column-gap: 3px
-  row-gap: 3px
+  column-gap: var(--box-gap)
+  row-gap: var(--box-gap)
   display: grid
-  grid-template-columns: repeat(3, calc(12rem + 2px))
-  grid-template-rows: repeat(3, calc(12rem + 2px))
-  height: calc(36rem + 12px)
-  width: calc(36rem + 12px)
+  grid-template-columns: repeat(3, calc(var(--square-size) * 3 + var(--square-gap) * 2))
+  grid-template-rows: repeat(3, calc(var(--square-size) * 3 + var(--square-gap) * 2))
+  height: calc(var(--square-size) * 9 + var(--square-gap) * 6 + var(--box-gap) * 2)
+  width: calc(var(--square-size) * 9 + var(--square-gap) * 6 + var(--box-gap) * 2)
   margin: 1rem auto
 
 .button-row
@@ -53,7 +64,17 @@ body
   margin: 1px
 
   &.active
+    background-color: #084512
     border: solid 1px #008000
 
   &.large
     font-size: 2.5em
+
+  &:active
+    background-color: #085512
+    border: solid 1px #108010
+
+  &:disabled
+    background-color: #283228
+    border-color: #103010
+

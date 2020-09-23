@@ -9,58 +9,35 @@ import {
   setNumber,
 } from "./Gamestate.js";
 import { squareAt, indexbox, neighbor } from "./Geometry.js";
+import Square from "./Square.js";
 import "./App.sass";
 
 const Mode = {
-  normal: 1,
-  corner: 2,
-  center: 3,
+  normal: "normal",
+  corner: "corner",
+  center: "center",
 };
 
-function ButtonRow(props) {
+function ButtonRow({ children, label, theme }) {
   return (
-    <div className="button-row">
-      <span>{props.label}</span>
-      {props.children}
+    <div className={`button-row theme-${theme}`}>
+      <span>{label}</span>
+      {children}
     </div>
   );
 }
 
-function Button(props) {
+function Button({ children, active, enabled, large, onClick, theme }) {
   return (
     <button
-      className={`button ${props.active ? "active" : ""} ${
-        props.large ? "large" : ""
+      className={`button${active ? " active" : ""}${large ? " large" : ""}${
+        theme ? ` theme-${theme}` : ""
       }`}
-      disabled={props.enabled === false}
-      onClick={props.onClick}
+      disabled={enabled === false}
+      onClick={onClick}
     >
-      {props.children}
+      {children}
     </button>
-  );
-}
-
-function Square(props) {
-  let inner = null;
-  if (props.number !== null) {
-    inner = <span className="number">{props.number}</span>;
-  } else {
-    inner = (
-      <>
-        <span className="corner">{props.corner}</span>
-        <span className="center">{props.center}</span>
-      </>
-    );
-  }
-  return (
-    <div
-      className={`square ${props.selected ? "selected" : ""} ${
-        props.cursor ? "cursor" : ""
-      }`}
-      data-index={props.index}
-    >
-      {inner}
-    </div>
   );
 }
 
@@ -301,11 +278,11 @@ function App() {
     return (
       <Square
         index={i}
-        cursor={selection.cursor === i}
+        has_cursor={selection.cursor === i}
         selected={selection.squares.includes(i)}
         number={currentState.numbers[i]}
-        corner={currentState.corners[i]}
-        center={currentState.centers[i]}
+        corners={currentState.corners[i]}
+        centers={currentState.centers[i]}
       />
     );
   }
@@ -358,23 +335,26 @@ function App() {
         <Button
           active={mode === Mode.normal}
           onClick={() => setMode(Mode.normal)}
+          theme="normal"
         >
           normal
         </Button>
         <Button
           active={mode === Mode.corner}
           onClick={() => setMode(Mode.corner)}
+          theme="corner"
         >
           corner
         </Button>
         <Button
           active={mode === Mode.center}
           onClick={() => setMode(Mode.center)}
+          theme="center"
         >
           center
         </Button>
       </ButtonRow>
-      <ButtonRow label="input">
+      <ButtonRow label="input" theme={mode}>
         <Button large onClick={() => inputDigit(1)}>
           1
         </Button>

@@ -1,22 +1,23 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBackspace } from "@fortawesome/free-solid-svg-icons";
 import {
-  EMPTY_GAME_STATE,
-  addCenter,
-  addCorner,
-  anyContains,
-  removeCenter,
-  removeCorner,
-  setNumber,
+  Action,
+  Mode,
+  INITIAL_GAMESTATE,
+  canRedo,
+  canUndo,
+  updateGamestate,
 } from "./Gamestate.js";
 import { squareAt, indexbox, neighbor } from "./Geometry.js";
 import Square from "./Square.js";
 import "./App.sass";
-
-const Mode = {
-  normal: "normal",
-  corner: "corner",
-  center: "center",
-};
 
 function ButtonRow({ children, label, theme }) {
   return (
@@ -27,12 +28,29 @@ function ButtonRow({ children, label, theme }) {
   );
 }
 
-function Button({ children, active, enabled, large, onClick, theme }) {
+function ButtonRowItem(props) {
+  return (
+    <Button
+      {...props}
+      className={(props.className ?? "") + " button-row-item"}
+    />
+  );
+}
+
+function Button({
+  children,
+  className,
+  active,
+  enabled,
+  large,
+  onClick,
+  theme,
+}) {
   return (
     <button
       className={`button${active ? " active" : ""}${large ? " large" : ""}${
         theme ? ` theme-${theme}` : ""
-      }`}
+      }${className ? ` ${className}` : ""}`}
       disabled={enabled === false}
       onClick={onClick}
     >
@@ -43,50 +61,13 @@ function Button({ children, active, enabled, large, onClick, theme }) {
 
 function App() {
   const [mode, setMode] = useState(Mode.normal);
-  const [gamestate, _setGamestate] = useState({
-    stack: [EMPTY_GAME_STATE],
-    index: 0,
-  });
+  const [gamestate, dispatch] = useReducer(updateGamestate, INITIAL_GAMESTATE);
   const [selection, setSelection] = useState({ squares: [], cursor: null });
 
   //
   // STATE
   //
-  const currentState = gamestate.stack[gamestate.index];
-
-  const pushState = useCallback((newstatefunc) => {
-    _setGamestate((gamestate) => {
-      const newState = newstatefunc(gamestate.stack[gamestate.index]);
-      const newStack = gamestate.stack.slice(0, gamestate.index + 1);
-      newStack.push(newState);
-      const newGamestate = { stack: newStack, index: gamestate.index + 1 };
-      return newGamestate;
-    });
-  }, []);
-
-  const undo = useCallback(() => {
-    _setGamestate((gamestate) => {
-      if (gamestate.index === 0) {
-        return gamestate;
-      }
-      return {
-        stack: gamestate.stack,
-        index: gamestate.index - 1,
-      };
-    });
-  }, []);
-
-  const redo = useCallback(() => {
-    _setGamestate((gamestate) => {
-      if (gamestate.index === gamestate.stack.length - 1) {
-        return gamestate;
-      }
-      return {
-        stack: gamestate.stack,
-        index: gamestate.index + 1,
-      };
-    });
-  }, []);
+  const currentBoard = gamestate.getIn(["boards", gamestate.get("index")]);
 
   //
   // SELECTION
@@ -140,28 +121,14 @@ function App() {
   const inputDigit = useCallback(
     (digit) => {
       console.log(`inputDigit(${digit})`);
-      pushState((gamestate) => {
-        switch (mode) {
-          case Mode.normal:
-            return setNumber(gamestate, selection.squares, digit);
-          case Mode.corner:
-            if (anyContains(gamestate.corners, selection.squares, digit)) {
-              return removeCorner(gamestate, selection.squares, digit);
-            } else {
-              return addCorner(gamestate, selection.squares, digit);
-            }
-          case Mode.center:
-            if (anyContains(gamestate.centers, selection.squares, digit)) {
-              return removeCenter(gamestate, selection.squares, digit);
-            } else {
-              return addCenter(gamestate, selection.squares, digit);
-            }
-          default:
-            return "this is not what the gamestate should be";
-        }
+      dispatch({
+        type: Action.input,
+        squares: selection.squares,
+        digit: digit,
+        mode: mode,
       });
     },
-    [pushState, mode, selection]
+    [mode, selection]
   );
 
   //
@@ -280,9 +247,9 @@ function App() {
         index={i}
         has_cursor={selection.cursor === i}
         selected={selection.squares.includes(i)}
-        number={currentState.numbers[i]}
-        corners={currentState.corners[i]}
-        centers={currentState.centers[i]}
+        number={currentBoard.get(i).get("number")}
+        corners={currentBoard.get(i).get("corners")}
+        centers={currentBoard.get(i).get("centers")}
       />
     );
   }
@@ -303,9 +270,9 @@ function App() {
     );
   }
 
-  const board = useRef(null);
+  const boardArea = useRef(null);
   useEffect(() => {
-    const node = board.current;
+    const node = boardArea.current;
     node.addEventListener("mousedown", handleMouseDown);
     node.addEventListener("mousemove", handleMouseMove);
     node.addEventListener("touchmove", handleTouchMove);
@@ -318,87 +285,94 @@ function App() {
     };
   }, [handleMouseDown, handleMouseMove, handleTouchMove, handleTouchStart]);
 
-  return (
-    <>
-      <div ref={board} className="board" onTouchMove={handleTouchMove}>
-        {renderBox(0)}
-        {renderBox(1)}
-        {renderBox(2)}
-        {renderBox(3)}
-        {renderBox(4)}
-        {renderBox(5)}
-        {renderBox(6)}
-        {renderBox(7)}
-        {renderBox(8)}
+  return [
+    <div ref={boardArea} className="board-area">
+      <ButtonRow label="tools">
+        <ButtonRowItem
+          onClick={() => dispatch({ type: Action.undo })}
+          enabled={canUndo(gamestate)}
+        >
+          undo
+        </ButtonRowItem>
+        <ButtonRowItem
+          onClick={() => dispatch({ type: Action.redo })}
+          enabled={canRedo(gamestate)}
+        >
+          redo
+        </ButtonRowItem>
+      </ButtonRow>
+      <div className="board-sizer">
+        <div className="board" onTouchMove={handleTouchMove}>
+          {renderBox(0)}
+          {renderBox(1)}
+          {renderBox(2)}
+          {renderBox(3)}
+          {renderBox(4)}
+          {renderBox(5)}
+          {renderBox(6)}
+          {renderBox(7)}
+          {renderBox(8)}
+        </div>
       </div>
+    </div>,
+    <div>
       <ButtonRow label="mode">
-        <Button
+        <ButtonRowItem
           active={mode === Mode.normal}
           onClick={() => setMode(Mode.normal)}
           theme="normal"
         >
           normal
-        </Button>
-        <Button
-          active={mode === Mode.corner}
-          onClick={() => setMode(Mode.corner)}
-          theme="corner"
+        </ButtonRowItem>
+        <ButtonRowItem
+          active={mode === Mode.corners}
+          onClick={() => setMode(Mode.corners)}
+          theme="corners"
         >
           corner
-        </Button>
-        <Button
-          active={mode === Mode.center}
-          onClick={() => setMode(Mode.center)}
-          theme="center"
+        </ButtonRowItem>
+        <ButtonRowItem
+          active={mode === Mode.centers}
+          onClick={() => setMode(Mode.centers)}
+          theme="centers"
         >
           center
-        </Button>
+        </ButtonRowItem>
       </ButtonRow>
       <ButtonRow label="input" theme={mode}>
-        <Button large onClick={() => inputDigit(1)}>
+        <ButtonRowItem large onClick={() => inputDigit(1)}>
           1
-        </Button>
-        <Button large onClick={() => inputDigit(2)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(2)}>
           2
-        </Button>
-        <Button large onClick={() => inputDigit(3)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(3)}>
           3
-        </Button>
-        <Button large onClick={() => inputDigit(4)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(4)}>
           4
-        </Button>
-        <Button large onClick={() => inputDigit(5)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(5)}>
           5
-        </Button>
-        <Button large onClick={() => inputDigit(6)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(6)}>
           6
-        </Button>
-        <Button large onClick={() => inputDigit(7)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(7)}>
           7
-        </Button>
-        <Button large onClick={() => inputDigit(8)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(8)}>
           8
-        </Button>
-        <Button large onClick={() => inputDigit(9)}>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(9)}>
           9
-        </Button>
-        <Button large onClick={() => inputDigit(null)}>
-          ⌫
-        </Button>
+        </ButtonRowItem>
+        <ButtonRowItem large onClick={() => inputDigit(null)}>
+          <FontAwesomeIcon icon={faBackspace} />
+        </ButtonRowItem>
       </ButtonRow>
-      <ButtonRow label="tools">
-        <Button onClick={() => undo()} enabled={gamestate.index > 0}>
-          undo
-        </Button>
-        <Button
-          onClick={() => redo()}
-          enabled={gamestate.index < gamestate.stack.length - 1}
-        >
-          redo
-        </Button>
-      </ButtonRow>
-    </>
-  );
+    </div>,
+  ];
 }
 
 export default App;

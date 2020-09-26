@@ -1,3 +1,16 @@
+*, *::before, *::after
+  box-sizing: border-box
+
+ul[class], ol[class]
+  list-style: none
+  padding: 0
+
+body, h1, h2, h3, h4, p, ul[class], ol[class], li, figure, figcaption, blockquote, dl, dd
+  margin: 0
+
+input, button, textarea, select
+  font: inherit
+
 @use "sass:color"
 
 @mixin theme($color)
@@ -16,38 +29,97 @@
   --color-text: #e0e0e0
   --color-text-disabled: #a0a0a0
 
-html
+.theme-normal
+  @include theme(#00a000)
+
+.theme-corners
+  @include theme(#00a080)
+
+.theme-centers
+  @include theme(#0080e0)
+
+\:root
   --square-gap: 1px
   --box-gap: 3px
   --square-size: 4rem
   --button-hue: 120
   @include theme(#d0d020)
-
-.theme-normal
-  @include theme(#00a000)
-.theme-corner
-  @include theme(#00a080)
-.theme-center
-  @include theme(#0080e0)
+  --font-serif: "Literata", serif
+  --font-sans: "Inter", sans-serif
+  --font-hint: "Inconsolata", monospace
 
 body
   background-color: #232730
   color: #d1d2d0
+  font-family: var(--font-sans)
+  line-height: 1
+  min-height: 100vh
 
 .title
+  font-family: var(--font-serif)
+  margin-top: 0.5em
   text-align: center
 
+#root
+  display: flex
+  margin-top: 1rem
+
+#root > *
+  flex-grow: 1
+
+.board-area
+  border: 1px solid #c0c0c0
+
+.board-sizer
+  position: relative
+  height: 36rem
+  width: 36rem
+  margin: 0 auto
+
+.board
+  position: absolute
+  top: 0
+  left: 0
+  bottom: 0
+  right: 0
+  column-gap: var(--box-gap)
+  row-gap: var(--box-gap)
+  display: grid
+  grid-template-columns: 1fr 1fr 1fr
+  grid-template-rows: 1fr 1fr 1fr
+  margin: 1rem
+
+.box
+  column-gap: var(--square-gap)
+  row-gap: var(--square-gap)
+  display: grid
+  grid-template-columns: 1fr 1fr 1fr
+  grid-template-rows: 1fr 1fr 1fr
+  user-select: none
+
 .square
-  background-color: #32393c
+  background-color: #30363c
   position: relative
   text-align: center
 
+  & > *
+    position: absolute
+    height: 100%
+    width: 100%
+
+  &.selected
+    background-color: mix(#32393c, #00a0e0, 90%)
+
+  .cursor
+    border: solid 1px #00a0e0
+
   .number
-    font-family: "Literata", serif
+    display: flex
+    align-items: center
+    justify-content: center
+    font-family: var(--font-serif)
     font-size: 2.5em
     font-weight: 500
-    line-height: var(--square-size)
-    text-align: center
 
     &.error
       font-style: italic
@@ -55,15 +127,14 @@ body
 
   .centers,
   .corners
-    font-family: "Inconsolata", monospace
+    font-family: var(--font-sans)
     font-size: 1em
     font-weight: 500
-    position: absolute
-    width: 100%
-    height: 100%
 
   .centers
-    line-height: var(--square-size)
+    display: flex
+    align-items: center
+    justify-content: center
 
   .corners
     align-content: space-between
@@ -71,42 +142,28 @@ body
     grid-template-areas: "a b c" "d e f" "g h i"
     grid-template-rows: 1fr 1fr 1fr
     grid-template-columns: 1fr 1fr 1fr
-
-  &.selected
-    background-color: mix(#32393c, #00a0e0, 90%)
-
-  &.cursor
-    border: solid 1px #00a0e0
-
-.box
-  column-gap: var(--square-gap)
-  row-gap: var(--square-gap)
-  display: grid
-  grid-template-columns: repeat(3, var(--square-size))
-  grid-template-rows: repeat(3, var(--square-size))
-  user-select: none
-  padding: 5px
-
-.board
-  column-gap: var(--box-gap)
-  row-gap: var(--box-gap)
-  display: grid
-  grid-template-columns: repeat(3, calc(var(--square-size) * 3 + var(--square-gap) * 2))
-  grid-template-rows: repeat(3, calc(var(--square-size) * 3 + var(--square-gap) * 2))
-  height: calc(var(--square-size) * 9 + var(--square-gap) * 6 + var(--box-gap) * 2)
-  width: calc(var(--square-size) * 9 + var(--square-gap) * 6 + var(--box-gap) * 2)
-  margin: 1rem auto
+    line-height: calc(var(--square-size) / 3)
 
 .button-row
   display: flex
   justify-content: center
+  align-items: center
+
+.button-row-item
+  flex-basis: 100%
+  flex-shrink: 1
+
+  &:first-child
+    // rounded corners!
+  &:last-child
+    // rounded corners!
 
 .button
   background-color: var(--color-background)
   border: solid 1px var(--color-border)
   color: var(--color-text)
   font-size: 1.5em
-  padding: 0.2em 0.5em
+  padding: 0.2em 0
   margin: 1px
 
   &:active

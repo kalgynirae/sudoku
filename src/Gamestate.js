@@ -1,67 +1,134 @@
-export const EMPTY_GAME_STATE = {
-  numbers: new Array(81).fill(null),
-  corners: new Array(81).fill(new Set()),
-  centers: new Array(81).fill(new Set()),
+import { List, Map, Set, Repeat, is } from "immutable";
+
+const INITIAL_BOARD = List(
+  Repeat(Map({ number: null, corners: Set(), centers: Set() }), 81)
+);
+
+export function anyContains(board, squares, type, digit) {
+  return squares
+    .map((i) => board.get(i))
+    .some((square) => square.hasIn([type, digit]));
+}
+
+export function setNumber(board, squares, digit) {
+  return squares.reduce(
+    (board, square) => board.setIn([square, "number"], digit),
+    board
+  );
+}
+
+export function addPencilMark(board, squares, type, digit) {
+  return squares.reduce(
+    (board, square) =>
+      board.updateIn([square, type], (marks) => marks.add(digit)),
+    board
+  );
+}
+
+export function clearPencilMarks(board, squares, type) {
+  return squares.reduce(
+    (board, square) => board.setIn([square, type], Set()),
+    board
+  );
+}
+
+export function removePencilMark(board, squares, type, digit) {
+  return squares.reduce(
+    (board, square) =>
+      board.updateIn([square, type], (marks) => marks.remove(digit)),
+    board
+  );
+}
+
+export const INITIAL_GAMESTATE = Map({
+  boards: List.of(INITIAL_BOARD),
+  index: 0,
+});
+
+export function updateBoard(gamestate, updater) {
+  const currentBoard = gamestate.getIn(["boards", gamestate.get("index")]);
+  const newBoard = updater(currentBoard);
+  if (is(newBoard, currentBoard)) {
+    return gamestate;
+  }
+  return gamestate.merge({
+    boards: gamestate
+      .get("boards")
+      .slice(0, gamestate.get("index") + 1)
+      .push(newBoard),
+    index: gamestate.get("index") + 1,
+  });
+}
+
+function undo(gamestate) {
+  return canUndo(gamestate)
+    ? gamestate.update("index", (i) => i - 1)
+    : gamestate;
+}
+
+function redo(gamestate) {
+  return canRedo(gamestate)
+    ? gamestate.update("index", (i) => i + 1)
+    : gamestate;
+}
+
+export function canUndo(gamestate) {
+  return gamestate.get("index") > 0;
+}
+
+export function canRedo(gamestate) {
+  return gamestate.get("index") < gamestate.get("boards").size - 1;
+}
+
+export const Mode = {
+  normal: "normal",
+  corners: "corners",
+  centers: "centers",
 };
 
-export function anyContains(substate, squares, digit) {
-  for (let i of squares) {
-    if (substate[i].has(digit)) return true;
+export const Action = {
+  input: "input",
+  undo: "undo",
+  redo: "redo",
+};
+
+export function updateGamestate(gamestate, action) {
+  switch (action.type) {
+    case Action.input:
+      return updateBoard(gamestate, (board) => {
+        switch (action.mode) {
+          case Mode.normal:
+            return setNumber(board, action.squares, action.digit);
+          case Mode.corners:
+          case Mode.centers:
+            if (action.digit === null) {
+              return clearPencilMarks(board, action.squares, action.mode);
+            } else if (
+              anyContains(board, action.squares, action.mode, action.digit)
+            ) {
+              return removePencilMark(
+                board,
+                action.squares,
+                action.mode,
+                action.digit
+              );
+            } else {
+              return addPencilMark(
+                board,
+                action.squares,
+                action.mode,
+                action.digit
+              );
+            }
+          default:
+            throw new Error(`Invalid action.mode: ${action.mode}`);
+        }
+      });
+    case Action.undo:
+      return undo(gamestate);
+    case Action.redo:
+      return redo(gamestate);
+    default:
+      throw new Error(`Invalid action.type: ${action.type}`);
   }
-  return false;
-}
-
-export function setNumber(state, squares, digit) {
-  const newstate = { ...state };
-  newstate.numbers = [...state.numbers];
-  for (let i of squares) {
-    newstate.numbers[i] = digit;
-  }
-  return newstate;
-}
-
-export function _addHint(substate, squares, digit) {
-  const newsubstate = [...substate];
-  for (let i of squares) {
-    if (!substate[i].has(digit)) {
-      newsubstate[i] = new Set(substate[i]);
-      newsubstate[i].add(digit);
-    }
-  }
-  return newsubstate;
-}
-
-export function _removeHint(substate, squares, digit) {
-  const newsubstate = [...substate];
-  for (let i of squares) {
-    if (substate[i].has(digit)) {
-      newsubstate[i] = new Set(substate[i]);
-      newsubstate[i].delete(digit);
-    }
-  }
-  return newsubstate;
-}
-
-export function addCorner(state, squares, digit) {
-  const newstate = { ...state };
-  newstate.corners = _addHint(state.corners, squares, digit);
-  return newstate;
-}
-
-export function removeCorner(state, squares, digit) {
-  const newstate = { ...state };
-  newstate.corners = _removeHint(state.corners, squares, digit);
-  return newstate;
-}
-
-export function addCenter(state, squares, digit) {
-  const newstate = { ...state };
-  newstate.centers = _addHint(state.centers, squares, digit);
-  return newstate;
-}
-
-export function removeCenter(state, squares, digit) {
-  const newstate = { ...state };
-  newstate.centers = _removeHint(state.centers, squares, digit);
-  return newstate;
 }

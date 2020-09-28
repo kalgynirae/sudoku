@@ -67,9 +67,6 @@ body
 #root > *
   flex-grow: 1
 
-.board-area
-  border: 1px solid #c0c0c0
-
 .board-sizer
   position: relative
   height: 36rem
@@ -143,41 +140,3 @@ body
     grid-template-rows: 1fr 1fr 1fr
     grid-template-columns: 1fr 1fr 1fr
     line-height: calc(var(--square-size) / 3)
-
-.button-row
-  display: flex
-  justify-content: center
-  align-items: center
-
-.button-row-item
-  flex-basis: 100%
-  flex-shrink: 1
-
-  &:first-child
-    // rounded corners!
-  &:last-child
-    // rounded corners!
-
-.button
-  background-color: var(--color-background)
-  border: solid 1px var(--color-border)
-  color: var(--color-text)
-  font-size: 1.5em
-  padding: 0.2em 0
-  margin: 1px
-
-  &:active
-    background-color: var(--color-background-pressed)
-    border-color: var(--color-border-pressed)
-
-  &:disabled
-    background-color: var(--color-background-disabled)
-    border-color: var(--color-border-disabled)
-    color: var(--color-text-disabled)
-
-  &.active
-    background-color: var(--color-background-active)
-    border-color: var(--color-border-active)
-
-  &.large
-    font-size: 2.5em

@@ -6,10 +6,11 @@ import React, {
   useState,
 } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBackspace } from "@fortawesome/free-solid-svg-icons";
+import { faBackspace, faRedo, faUndo } from "@fortawesome/free-solid-svg-icons";
+import { ThemeProvider } from "styled-components";
 import {
   Action,
-  Mode,
+  Modes,
   INITIAL_GAMESTATE,
   canRedo,
   canUndo,
@@ -18,49 +19,12 @@ import {
 import { squareAt, indexbox, neighbor } from "./Geometry.js";
 import Square from "./Square.js";
 import "./App.sass";
+import { Button, ButtonRow } from "./Buttons.js";
+import { Themes, ModeTheme } from "./Colors.js";
+import styled from "styled-components";
 
-function ButtonRow({ children, label, theme }) {
-  return (
-    <div className={`button-row theme-${theme}`}>
-      <span>{label}</span>
-      {children}
-    </div>
-  );
-}
-
-function ButtonRowItem(props) {
-  return (
-    <Button
-      {...props}
-      className={(props.className ?? "") + " button-row-item"}
-    />
-  );
-}
-
-function Button({
-  children,
-  className,
-  active,
-  enabled,
-  large,
-  onClick,
-  theme,
-}) {
-  return (
-    <button
-      className={`button${active ? " active" : ""}${large ? " large" : ""}${
-        theme ? ` theme-${theme}` : ""
-      }${className ? ` ${className}` : ""}`}
-      disabled={enabled === false}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}
-
-function App() {
-  const [mode, setMode] = useState(Mode.normal);
+export default function App() {
+  const [mode, setMode] = useState(Modes.normal);
   const [gamestate, dispatch] = useReducer(updateGamestate, INITIAL_GAMESTATE);
   const [selection, setSelection] = useState({ squares: [], cursor: null });
 
@@ -285,94 +249,99 @@ function App() {
     };
   }, [handleMouseDown, handleMouseMove, handleTouchMove, handleTouchStart]);
 
-  return [
-    <div ref={boardArea} className="board-area">
-      <ButtonRow label="tools">
-        <ButtonRowItem
-          onClick={() => dispatch({ type: Action.undo })}
-          enabled={canUndo(gamestate)}
-        >
-          undo
-        </ButtonRowItem>
-        <ButtonRowItem
-          onClick={() => dispatch({ type: Action.redo })}
-          enabled={canRedo(gamestate)}
-        >
-          redo
-        </ButtonRowItem>
-      </ButtonRow>
-      <div className="board-sizer">
-        <div className="board" onTouchMove={handleTouchMove}>
-          {renderBox(0)}
-          {renderBox(1)}
-          {renderBox(2)}
-          {renderBox(3)}
-          {renderBox(4)}
-          {renderBox(5)}
-          {renderBox(6)}
-          {renderBox(7)}
-          {renderBox(8)}
+  return (
+    <ThemeProvider theme={Themes.default}>
+      <BoardArea ref={boardArea}>
+        <ButtonRow>
+          <Button>1</Button>
+          <Button>2</Button>
+          <Button>3</Button>
+          <Button>4</Button>
+          <Button>5</Button>
+          <Button>6</Button>
+          <Button>7</Button>
+          <Button>8</Button>
+          <Button>9</Button>
+        </ButtonRow>
+        <ButtonRow>
+          <Button
+            onClick={() => dispatch({ type: Action.undo })}
+            enabled={canUndo(gamestate)}
+          >
+            <FontAwesomeIcon icon={faUndo} size="sm" />
+          </Button>
+          <Button
+            onClick={() => dispatch({ type: Action.redo })}
+            enabled={canRedo(gamestate)}
+          >
+            <FontAwesomeIcon icon={faRedo} size="sm" />
+          </Button>
+        </ButtonRow>
+        <div className="board-sizer">
+          <div className="board" onTouchMove={handleTouchMove}>
+            {renderBox(0)}
+            {renderBox(1)}
+            {renderBox(2)}
+            {renderBox(3)}
+            {renderBox(4)}
+            {renderBox(5)}
+            {renderBox(6)}
+            {renderBox(7)}
+            {renderBox(8)}
+          </div>
         </div>
+      </BoardArea>
+      <div>
+        <ButtonRow stretch>
+          <ThemeProvider theme={ModeTheme[Modes.normal]}>
+            <Button
+              active={mode === Modes.normal}
+              onClick={() => setMode(Modes.normal)}
+              theme="normal"
+            >
+              normal
+            </Button>
+          </ThemeProvider>
+          <ThemeProvider theme={ModeTheme[Modes.corners]}>
+            <Button
+              active={mode === Modes.corners}
+              onClick={() => setMode(Modes.corners)}
+              theme="corners"
+            >
+              corner
+            </Button>
+          </ThemeProvider>
+          <ThemeProvider theme={ModeTheme[Modes.centers]}>
+            <Button
+              active={mode === Modes.centers}
+              onClick={() => setMode(Modes.centers)}
+              theme="centers"
+            >
+              center
+            </Button>
+          </ThemeProvider>
+        </ButtonRow>
+        <ThemeProvider theme={ModeTheme[mode]}>
+          <ButtonRow large stretch>
+            <Button onClick={() => inputDigit(1)}>1</Button>
+            <Button onClick={() => inputDigit(2)}>2</Button>
+            <Button onClick={() => inputDigit(3)}>3</Button>
+            <Button onClick={() => inputDigit(4)}>4</Button>
+            <Button onClick={() => inputDigit(5)}>5</Button>
+            <Button onClick={() => inputDigit(6)}>6</Button>
+            <Button onClick={() => inputDigit(7)}>7</Button>
+            <Button onClick={() => inputDigit(8)}>8</Button>
+            <Button onClick={() => inputDigit(9)}>9</Button>
+            <Button onClick={() => inputDigit(null)}>
+              <FontAwesomeIcon icon={faBackspace} size="sm" />
+            </Button>
+          </ButtonRow>
+        </ThemeProvider>
       </div>
-    </div>,
-    <div>
-      <ButtonRow label="mode">
-        <ButtonRowItem
-          active={mode === Mode.normal}
-          onClick={() => setMode(Mode.normal)}
-          theme="normal"
-        >
-          normal
-        </ButtonRowItem>
-        <ButtonRowItem
-          active={mode === Mode.corners}
-          onClick={() => setMode(Mode.corners)}
-          theme="corners"
-        >
-          corner
-        </ButtonRowItem>
-        <ButtonRowItem
-          active={mode === Mode.centers}
-          onClick={() => setMode(Mode.centers)}
-          theme="centers"
-        >
-          center
-        </ButtonRowItem>
-      </ButtonRow>
-      <ButtonRow label="input" theme={mode}>
-        <ButtonRowItem large onClick={() => inputDigit(1)}>
-          1
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(2)}>
-          2
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(3)}>
-          3
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(4)}>
-          4
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(5)}>
-          5
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(6)}>
-          6
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(7)}>
-          7
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(8)}>
-          8
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(9)}>
-          9
-        </ButtonRowItem>
-        <ButtonRowItem large onClick={() => inputDigit(null)}>
-          <FontAwesomeIcon icon={faBackspace} />
-        </ButtonRowItem>
-      </ButtonRow>
-    </div>,
-  ];
+    </ThemeProvider>
+  );
 }
 
-export default App;
+const BoardArea = styled.div`
+  border: 1px solid ${(p) => p.theme.border};
+`;

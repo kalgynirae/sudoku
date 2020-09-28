@@ -80,7 +80,7 @@ export function canRedo(gamestate) {
   return gamestate.get("index") < gamestate.get("boards").size - 1;
 }
 
-export const Mode = {
+export const Modes = {
   normal: "normal",
   corners: "corners",
   centers: "centers",
@@ -97,10 +97,10 @@ export function updateGamestate(gamestate, action) {
     case Action.input:
       return updateBoard(gamestate, (board) => {
         switch (action.mode) {
-          case Mode.normal:
+          case Modes.normal:
             return setNumber(board, action.squares, action.digit);
-          case Mode.corners:
-          case Mode.centers:
+          case Modes.corners:
+          case Modes.centers:
             if (action.digit === null) {
               return clearPencilMarks(board, action.squares, action.mode);
             } else if (

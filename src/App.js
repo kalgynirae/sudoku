@@ -18,7 +18,6 @@ import {
 } from "./Gamestate.js";
 import { squareAt, indexbox, neighbor } from "./Geometry.js";
 import Square from "./Square.js";
-import "./App.sass";
 import { Board, Box } from "./Board.js";
 import { Button, ButtonRow } from "./Buttons.js";
 import { Themes, ModeTheme } from "./Colors.js";

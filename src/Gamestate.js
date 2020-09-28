@@ -96,32 +96,39 @@ export function updateGamestate(gamestate, action) {
   switch (action.type) {
     case Action.input:
       return updateBoard(gamestate, (board) => {
-        switch (action.mode) {
-          case Modes.normal:
-            return setNumber(board, action.squares, action.digit);
-          case Modes.corners:
-          case Modes.centers:
-            if (action.digit === null) {
-              return clearPencilMarks(board, action.squares, action.mode);
-            } else if (
-              anyContains(board, action.squares, action.mode, action.digit)
-            ) {
-              return removePencilMark(
-                board,
-                action.squares,
-                action.mode,
-                action.digit
-              );
-            } else {
-              return addPencilMark(
-                board,
-                action.squares,
-                action.mode,
-                action.digit
-              );
-            }
-          default:
-            throw new Error(`Invalid action.mode: ${action.mode}`);
+        if (
+          (action.mode === Modes.normal && action.squares.length === 1) ||
+          (action.mode === Modes.normal && action.digit === null)
+        ) {
+          return setNumber(board, action.squares, action.digit);
+        } else if (
+          action.mode === Modes.normal ||
+          action.mode === Modes.corners ||
+          action.mode === Modes.centers
+        ) {
+          const effectiveMode =
+            action.mode === Modes.normal ? Modes.corners : action.mode;
+          if (action.digit === null) {
+            return clearPencilMarks(board, action.squares, effectiveMode);
+          } else if (
+            anyContains(board, action.squares, effectiveMode, action.digit)
+          ) {
+            return removePencilMark(
+              board,
+              action.squares,
+              effectiveMode,
+              action.digit
+            );
+          } else {
+            return addPencilMark(
+              board,
+              action.squares,
+              effectiveMode,
+              action.digit
+            );
+          }
+        } else {
+          throw new Error(`Invalid action.mode: ${action.mode}`);
         }
       });
     case Action.undo:

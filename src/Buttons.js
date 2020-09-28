@@ -39,9 +39,10 @@ const StyledButton = styled.button`
   border: solid 1px black;
   border-right-width: 0;
   box-shadow: inset 0px 1px 0px ${(p) => p.theme.button.brighten(0.3)};
-  color: white;
+  color: ${(p) => p.theme.text};
   font-size: 1.5em;
-  line-height: 2;
+  line-height: 1.8;
+  padding: 0 0.5em;
   text-shadow: 1px 1px 0px black;
 
   &:hover {
@@ -51,7 +52,8 @@ const StyledButton = styled.button`
       ${(p) => p.theme.button} 100%
     );
   }
-  &:active {
+  &:active,
+  &.active {
     background: linear-gradient(
       to bottom,
       ${(p) => p.theme.button.darken(0.2)} 20%,

@@ -19,14 +19,19 @@ import {
 import { squareAt, indexbox, neighbor } from "./Geometry.js";
 import Square from "./Square.js";
 import "./App.sass";
+import { Board, Box } from "./Board.js";
 import { Button, ButtonRow } from "./Buttons.js";
 import { Themes, ModeTheme } from "./Colors.js";
-import styled from "styled-components";
+import styled, { createGlobalStyle } from "styled-components";
 
 export default function App() {
   const [mode, setMode] = useState(Modes.normal);
   const [gamestate, dispatch] = useReducer(updateGamestate, INITIAL_GAMESTATE);
-  const [selection, setSelection] = useState({ squares: [], cursor: null });
+  const [selection, setSelection] = useState({
+    squares: [],
+    cursor: null,
+    usingCursor: false,
+  });
 
   //
   // STATE
@@ -47,10 +52,14 @@ export default function App() {
   const selectSquare = useCallback((i) => {
     console.log(`selectSquare(${i})`);
     setSelection((selection) => {
+      if (selection.squares.includes(i)) {
+        return selection;
+      }
       const newSelection = { ...selection };
       newSelection.squares = [...selection.squares];
       newSelection.squares.push(i);
       newSelection.cursor = i;
+      newSelection.usingCursor = false;
       return newSelection;
     });
   }, []);
@@ -73,6 +82,7 @@ export default function App() {
         const newSelection = { ...selection };
         newSelection.squares = [...selection.squares, i];
         newSelection.cursor = i;
+        newSelection.usingCursor = true;
         return newSelection;
       });
     },
@@ -209,7 +219,7 @@ export default function App() {
     return (
       <Square
         index={i}
-        has_cursor={selection.cursor === i}
+        hasCursor={selection.usingCursor && selection.cursor === i}
         selected={selection.squares.includes(i)}
         number={currentBoard.get(i).get("number")}
         corners={currentBoard.get(i).get("corners")}
@@ -220,7 +230,7 @@ export default function App() {
 
   function renderBox(i) {
     return (
-      <div className="box">
+      <Box>
         {renderSquare(i, 0)}
         {renderSquare(i, 1)}
         {renderSquare(i, 2)}
@@ -230,7 +240,7 @@ export default function App() {
         {renderSquare(i, 6)}
         {renderSquare(i, 7)}
         {renderSquare(i, 8)}
-      </div>
+      </Box>
     );
   }
 
@@ -251,18 +261,9 @@ export default function App() {
 
   return (
     <ThemeProvider theme={Themes.default}>
-      <BoardArea ref={boardArea}>
-        <ButtonRow>
-          <Button>1</Button>
-          <Button>2</Button>
-          <Button>3</Button>
-          <Button>4</Button>
-          <Button>5</Button>
-          <Button>6</Button>
-          <Button>7</Button>
-          <Button>8</Button>
-          <Button>9</Button>
-        </ButtonRow>
+      <GlobalStyle />
+      <FlexRow>
+        <FocusSelector />
         <ButtonRow>
           <Button
             onClick={() => dispatch({ type: Action.undo })}
@@ -277,20 +278,20 @@ export default function App() {
             <FontAwesomeIcon icon={faRedo} size="sm" />
           </Button>
         </ButtonRow>
-        <div className="board-sizer">
-          <div className="board" onTouchMove={handleTouchMove}>
-            {renderBox(0)}
-            {renderBox(1)}
-            {renderBox(2)}
-            {renderBox(3)}
-            {renderBox(4)}
-            {renderBox(5)}
-            {renderBox(6)}
-            {renderBox(7)}
-            {renderBox(8)}
-          </div>
-        </div>
-      </BoardArea>
+      </FlexRow>
+      <ThemeProvider theme={ModeTheme[mode]}>
+        <Board boardAreaRef={boardArea} handleTouchMove={handleTouchMove}>
+          {renderBox(0)}
+          {renderBox(1)}
+          {renderBox(2)}
+          {renderBox(3)}
+          {renderBox(4)}
+          {renderBox(5)}
+          {renderBox(6)}
+          {renderBox(7)}
+          {renderBox(8)}
+        </Board>
+      </ThemeProvider>
       <div>
         <ButtonRow stretch>
           <ThemeProvider theme={ModeTheme[Modes.normal]}>
@@ -342,6 +343,78 @@ export default function App() {
   );
 }
 
-const BoardArea = styled.div`
-  border: 1px solid ${(p) => p.theme.border};
+const GlobalStyle = createGlobalStyle`
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  ul[class], ol[class] {
+    list-style: none;
+    padding: 0;
+  }
+
+  body, h1, h2, h3, h4, p, ul[class], ol[class], li, figure, figcaption, blockquote, dl, dd {
+    margin: 0;
+  }
+
+  input, button, textarea, select {
+    font: inherit;
+  }
+
+  :root {
+    --square-gap: 2px;
+    --box-gap: 4px;
+    --square-size: 4rem;
+    --button-hue: 120;
+    --font-serif: "Literata", serif;
+    --font-sans: "Inter", sans-serif;
+    --font-hint: "Inconsolata", monospace;
+  }
+
+  body {
+    background-color: ${(p) => p.theme.background};
+    color: ${(p) => p.theme.text};
+    font-family: var(--font-sans);
+    line-height: 1;
+    touch-action: manipulation;
+  }
+
+  .title {
+    font-family: var(--font-serif);
+    margin-top: 0.5em;
+    text-align: center;
+  }
+
+  #root {
+    display: flex;
+    flex-direction: column;
+    margin-top: 1rem;
+  }
+
+  #root > * {
+    flex-grow: 1;
+  }
+
+  .box {
+  }
 `;
+
+const FlexRow = styled.div`
+  display: flex;
+  justify-content: center;
+`;
+function FocusSelector() {
+  return (
+    <ButtonRow>
+      <Button>1</Button>
+      <Button>2</Button>
+      <Button>3</Button>
+      <Button>4</Button>
+      <Button>5</Button>
+      <Button>6</Button>
+      <Button>7</Button>
+      <Button>8</Button>
+      <Button>9</Button>
+    </ButtonRow>
+  );
+}

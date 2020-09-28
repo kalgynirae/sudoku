@@ -1,4 +1,5 @@
-import React from "react";
+import React, { createContext, useContext } from "react";
+import styled from "styled-components";
 
 const CORNER_GRID_AREA_SETS = {
   1: "a",
@@ -12,17 +13,69 @@ const CORNER_GRID_AREA_SETS = {
   9: "abcdefghi",
 };
 
+const StyledSquare = styled.div`
+  background-color: #30363c;
+  position: relative;
+  text-align: center;
+
+  & > * {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+  }
+
+  &.selected {
+    background-color: ${(p) => p.theme.selection};
+  }
+
+  .number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-serif);
+    font-size: 2.5em;
+    font-weight: 500;
+  }
+
+  &.error {
+    font-style: italic;
+    font-weight: 300;
+  }
+
+  .centers,
+  .corners {
+    font-family: var(--font-sans);
+    font-size: 1em;
+    font-weight: 500;
+  }
+
+  .centers {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .corners {
+    align-content: space-between;
+    display: grid;
+    grid-template-areas: "a b c" "d e f" "g h i";
+    grid-template-rows: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
+    line-height: calc(var(--square-size) / 3);
+  }
+`;
+
 export default function Square({
   centers,
   corners,
-  has_cursor,
+  hasCursor,
   index,
   number,
   selected,
 }) {
   let cursor = null;
-  if (has_cursor) {
-    cursor = <div className="cursor" />;
+  if (hasCursor) {
+    cursor = <Cursor />;
   }
 
   let number_or_hints = [];
@@ -42,10 +95,13 @@ export default function Square({
   }
 
   return (
-    <div className={`square${selected ? " selected" : ""}`} data-index={index}>
+    <StyledSquare
+      className={`square${selected ? " selected" : ""}`}
+      data-index={index}
+    >
       {cursor}
       {number_or_hints}
-    </div>
+    </StyledSquare>
   );
 }
 
@@ -77,3 +133,7 @@ function makeCenters(centers) {
     </div>
   );
 }
+
+const Cursor = styled.div`
+  border: solid 1px ${(p) => p.theme.base};
+`;

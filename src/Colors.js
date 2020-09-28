@@ -1,12 +1,18 @@
 import chroma from "chroma-js";
 import { Modes } from "./Gamestate.js";
 
-function makeTheme(c) {
-  const theme = {
-    base: c,
-    border: chroma("#a0a0a0"),
-    button: c.darken(0.8),
-  };
+function makeTheme(base) {
+  const theme = { base: base };
+
+  theme.background = chroma("#232729");
+  theme.border = chroma("#a0a0a0");
+  theme.text = chroma("#d1d2d0");
+
+  theme.button = theme.base.darken(0.8);
+
+  theme.square = chroma("#30363c");
+  theme.selection = chroma.mix(theme.base, theme.square, 0.6, "lab");
+
   return theme;
 }
 

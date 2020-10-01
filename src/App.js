@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -14,28 +15,42 @@ import {
   INITIAL_GAMESTATE,
   canRedo,
   canUndo,
+  getErrors,
   updateGamestate,
 } from "./Gamestate.js";
-import { squareAt, indexbox, neighbor } from "./Geometry.js";
-import Square from "./Square.js";
-import { Board, Box } from "./Board.js";
+import { squareAt, neighbor } from "./Geometry.js";
+import { Board } from "./Board.js";
 import { Button, ButtonRow } from "./Buttons.js";
 import { Themes, ModeTheme } from "./Colors.js";
+import { Settings, INITIAL_SETTINGS, updateSettings } from "./Settings.js";
 import styled, { createGlobalStyle } from "styled-components";
+import "normalize.css";
+import { Set } from "immutable";
 
 export default function App() {
   const [mode, setMode] = useState(Modes.normal);
-  const [gamestate, dispatch] = useReducer(updateGamestate, INITIAL_GAMESTATE);
+  const [gamestate, dispatchGamestate] = useReducer(
+    updateGamestate,
+    INITIAL_GAMESTATE
+  );
   const [selection, setSelection] = useState({
     squares: [],
     cursor: null,
     usingCursor: false,
   });
+  const [settings, dispatchSettings] = useReducer(
+    updateSettings,
+    INITIAL_SETTINGS
+  );
 
   //
   // STATE
   //
   const currentBoard = gamestate.getIn(["boards", gamestate.get("index")]);
+  const currentErrors = useMemo(
+    () => (settings.get("highlightErrors") ? getErrors(currentBoard) : Set()),
+    [currentBoard, settings]
+  );
 
   //
   // SELECTION
@@ -94,14 +109,15 @@ export default function App() {
   const inputDigit = useCallback(
     (digit) => {
       console.log(`inputDigit(${digit})`);
-      dispatch({
-        type: Action.input,
+      dispatchGamestate({
+        action: Action.input,
         squares: selection.squares,
         digit: digit,
         mode: mode,
+        settings: settings,
       });
     },
-    [mode, selection]
+    [mode, selection, settings]
   );
 
   //
@@ -213,36 +229,6 @@ export default function App() {
   //
   // RENDER
   //
-  function renderSquare(ibox, isquare) {
-    const i = indexbox(ibox, isquare);
-    return (
-      <Square
-        index={i}
-        hasCursor={selection.usingCursor && selection.cursor === i}
-        selected={selection.squares.includes(i)}
-        number={currentBoard.get(i).get("number")}
-        corners={currentBoard.get(i).get("corners")}
-        centers={currentBoard.get(i).get("centers")}
-      />
-    );
-  }
-
-  function renderBox(i) {
-    return (
-      <Box>
-        {renderSquare(i, 0)}
-        {renderSquare(i, 1)}
-        {renderSquare(i, 2)}
-        {renderSquare(i, 3)}
-        {renderSquare(i, 4)}
-        {renderSquare(i, 5)}
-        {renderSquare(i, 6)}
-        {renderSquare(i, 7)}
-        {renderSquare(i, 8)}
-      </Box>
-    );
-  }
-
   const boardArea = useRef(null);
   useEffect(() => {
     const node = boardArea.current;
@@ -263,33 +249,32 @@ export default function App() {
       <GlobalStyle />
       <FlexRow>
         <FocusSelector />
-        <ButtonRow>
-          <Button
-            onClick={() => dispatch({ type: Action.undo })}
-            enabled={canUndo(gamestate)}
-          >
-            <FontAwesomeIcon icon={faUndo} size="sm" />
-          </Button>
-          <Button
-            onClick={() => dispatch({ type: Action.redo })}
-            enabled={canRedo(gamestate)}
-          >
-            <FontAwesomeIcon icon={faRedo} size="sm" />
-          </Button>
-        </ButtonRow>
+        <ThemeProvider theme={Themes.red}>
+          <ButtonRow>
+            <Button
+              onClick={() => dispatchGamestate({ action: Action.undo })}
+              enabled={canUndo(gamestate)}
+            >
+              <FontAwesomeIcon icon={faUndo} size="sm" />
+            </Button>
+            <Button
+              onClick={() => dispatchGamestate({ action: Action.redo })}
+              enabled={canRedo(gamestate)}
+            >
+              <FontAwesomeIcon icon={faRedo} size="sm" />
+            </Button>
+          </ButtonRow>
+        </ThemeProvider>
       </FlexRow>
       <ThemeProvider theme={ModeTheme[mode]}>
-        <Board boardAreaRef={boardArea} handleTouchMove={handleTouchMove}>
-          {renderBox(0)}
-          {renderBox(1)}
-          {renderBox(2)}
-          {renderBox(3)}
-          {renderBox(4)}
-          {renderBox(5)}
-          {renderBox(6)}
-          {renderBox(7)}
-          {renderBox(8)}
-        </Board>
+        <Board
+          boardAreaRef={boardArea}
+          handleTouchMove={handleTouchMove}
+          board={currentBoard}
+          errors={currentErrors}
+          selection={selection}
+          settings={settings}
+        />
       </ThemeProvider>
       <div>
         <ButtonRow stretch>
@@ -338,31 +323,13 @@ export default function App() {
           </ButtonRow>
         </ThemeProvider>
       </div>
+      <Settings settings={settings} dispatchSettings={dispatchSettings} />
     </ThemeProvider>
   );
 }
 
 const GlobalStyle = createGlobalStyle`
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
-
-  ul[class], ol[class] {
-    list-style: none;
-    padding: 0;
-  }
-
-  body, h1, h2, h3, h4, p, ul[class], ol[class], li, figure, figcaption, blockquote, dl, dd {
-    margin: 0;
-  }
-
-  input, button, textarea, select {
-    font: inherit;
-  }
-
   :root {
-    --square-gap: 2px;
-    --box-gap: 4px;
     --square-size: 4rem;
     --button-hue: 120;
     --font-serif: "Literata", serif;
@@ -375,7 +342,6 @@ const GlobalStyle = createGlobalStyle`
     color: ${(p) => p.theme.text};
     font-family: var(--font-sans);
     line-height: 1;
-    touch-action: manipulation;
   }
 
   .title {
@@ -393,15 +359,13 @@ const GlobalStyle = createGlobalStyle`
   #root > * {
     flex-grow: 1;
   }
-
-  .box {
-  }
 `;
 
 const FlexRow = styled.div`
   display: flex;
   justify-content: center;
 `;
+
 function FocusSelector() {
   return (
     <ButtonRow>

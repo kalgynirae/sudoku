@@ -1,5 +1,6 @@
-import React, { createContext, useContext } from "react";
+import React from "react";
 import styled from "styled-components";
+import { Themes } from "./Colors.js";
 
 const CORNER_GRID_AREA_SETS = {
   1: "a",
@@ -24,22 +25,37 @@ const StyledSquare = styled.div`
     width: 100%;
   }
 
+  &.error {
+    color: ${(p) => Themes.red.base.saturate(0.5)};
+    font-style: italic;
+  }
+  }
+  &.highlighted {
+    background-color: ${(p) => p.theme.highlight};
+  }
   &.selected {
     background-color: ${(p) => p.theme.selection};
   }
 
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+      transform: translateY(0.2em);
+    }
+    100% {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
   .number {
+    animation: fade-in 0.1s ease;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: var(--font-serif);
     font-size: 2.5em;
     font-weight: 500;
-  }
-
-  &.error {
-    font-style: italic;
-    font-weight: 300;
   }
 
   .centers,
@@ -68,7 +84,9 @@ const StyledSquare = styled.div`
 export default function Square({
   centers,
   corners,
+  error,
   hasCursor,
+  highlighted,
   index,
   number,
   selected,
@@ -96,7 +114,9 @@ export default function Square({
 
   return (
     <StyledSquare
-      className={`square${selected ? " selected" : ""}`}
+      className={`square${selected ? " selected" : ""}${
+        highlighted ? " highlighted" : ""
+      }${error ? " error" : ""}`}
       data-index={index}
     >
       {cursor}
@@ -135,5 +155,6 @@ function makeCenters(centers) {
 }
 
 const Cursor = styled.div`
-  border: solid 1px ${(p) => p.theme.base};
+  border: solid 1px ${(p) => p.theme.base.brighten(0.2)};
+  box-sizing: border-box;
 `;

@@ -1,4 +1,5 @@
-import { List, Map, Set, Repeat, is } from "immutable";
+import { List, Map, Set, Range, Repeat, is } from "immutable";
+import { affectedBy, row, col, box } from "./Geometry.js";
 
 const INITIAL_BOARD = List(
   Repeat(Map({ number: null, corners: Set(), centers: Set() }), 81)
@@ -10,11 +11,15 @@ export function anyContains(board, squares, type, digit) {
     .some((square) => square.hasIn([type, digit]));
 }
 
-export function setNumber(board, squares, digit) {
-  return squares.reduce(
-    (board, square) => board.setIn([square, "number"], digit),
-    board
-  );
+export function setNumber(settings, board, square, digit) {
+  const affectedSquares = affectedBy(square);
+  return board.withMutations((board) => {
+    board.setIn([square, "number"], digit);
+    if (settings.get("automaticallyRemoveHints")) {
+      removePencilMark(board, affectedSquares, "corners", digit);
+      removePencilMark(board, affectedSquares, "centers", digit);
+    }
+  });
 }
 
 export function addPencilMark(board, squares, type, digit) {
@@ -92,43 +97,48 @@ export const Action = {
   redo: "redo",
 };
 
-export function updateGamestate(gamestate, action) {
-  switch (action.type) {
+export function updateGamestate(
+  gamestate,
+  { action, mode, squares, digit, settings }
+) {
+  switch (action) {
     case Action.input:
       return updateBoard(gamestate, (board) => {
         if (
-          (action.mode === Modes.normal && action.squares.length === 1) ||
-          (action.mode === Modes.normal && action.digit === null)
+          (mode === Modes.normal && squares.length === 1) ||
+          (mode === Modes.normal && digit === null)
         ) {
-          return setNumber(board, action.squares, action.digit);
+          return setNumber(settings, board, squares[0], digit);
         } else if (
-          action.mode === Modes.normal ||
-          action.mode === Modes.corners ||
-          action.mode === Modes.centers
+          mode === Modes.normal ||
+          mode === Modes.corners ||
+          mode === Modes.centers
         ) {
-          const effectiveMode =
-            action.mode === Modes.normal ? Modes.corners : action.mode;
-          if (action.digit === null) {
-            return clearPencilMarks(board, action.squares, effectiveMode);
+          const incompleteSquares = squares.filter(
+            (s) => board.get(s).get("number") === null
+          );
+          const effectiveMode = mode === Modes.normal ? Modes.corners : mode;
+          if (digit === null) {
+            return clearPencilMarks(board, incompleteSquares, effectiveMode);
           } else if (
-            anyContains(board, action.squares, effectiveMode, action.digit)
+            anyContains(board, incompleteSquares, effectiveMode, digit)
           ) {
             return removePencilMark(
               board,
-              action.squares,
+              incompleteSquares,
               effectiveMode,
-              action.digit
+              digit
             );
           } else {
             return addPencilMark(
               board,
-              action.squares,
+              incompleteSquares,
               effectiveMode,
-              action.digit
+              digit
             );
           }
         } else {
-          throw new Error(`Invalid action.mode: ${action.mode}`);
+          throw new Error(`Invalid mode: ${mode}`);
         }
       });
     case Action.undo:
@@ -136,6 +146,26 @@ export function updateGamestate(gamestate, action) {
     case Action.redo:
       return redo(gamestate);
     default:
-      throw new Error(`Invalid action.type: ${action.type}`);
+      throw new Error(`Invalid action: ${action}`);
   }
+}
+
+export function getErrors(board) {
+  const rows = Range(0, 9).map((r) => row(r));
+  const columns = Range(0, 9).map((c) => col(c));
+  const boxes = Range(0, 9).map((b) => box(b));
+  const sections = rows.concat(columns, boxes);
+  const errorSquares = Set().asMutable();
+  sections.forEach((section) => {
+    const squareNumbers = Map(
+      section.map((s) => [s, board.getIn([s, "number"])])
+    ).filter((v) => v !== null);
+    const numberCounts = squareNumbers.countBy((number) => number);
+    squareNumbers.forEach((number, s) => {
+      if (numberCounts.get(number) > 1) {
+        errorSquares.add(s);
+      }
+    });
+  });
+  return errorSquares.asImmutable();
 }

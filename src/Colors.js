@@ -11,7 +11,8 @@ function makeTheme(base) {
   theme.button = theme.base.darken(0.8);
 
   theme.square = chroma("#30363c");
-  theme.selection = chroma.mix(theme.base, theme.square, 0.6, "lab");
+  theme.selection = chroma.mix(theme.square, theme.base, 0.5, "lab");
+  theme.highlight = chroma.mix(theme.square, theme.base, 0.15, "lab");
 
   return theme;
 }

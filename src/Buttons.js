@@ -1,6 +1,5 @@
 import React from "react";
 import styled from "styled-components";
-import { Themes } from "./Colors.js";
 
 export const StyledButtonRow = styled.div`
   display: flex;
@@ -44,6 +43,7 @@ const StyledButton = styled.button`
   line-height: 1.8;
   padding: 0 0.5em;
   text-shadow: 1px 1px 0px black;
+  touch-action: none;
 
   &:hover {
     background: linear-gradient(

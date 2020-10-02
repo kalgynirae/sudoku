@@ -15,8 +15,9 @@ const CORNER_GRID_AREA_SETS = {
 };
 
 const StyledSquare = styled.div`
-  background-color: #30363c;
+  background-color: ${(p) => p.theme.square};
   position: relative;
+  transition: background-color 0.2s ease-out;
   text-align: center;
 
   & > * {
@@ -25,16 +26,34 @@ const StyledSquare = styled.div`
     width: 100%;
   }
 
-  &.error {
-    color: ${(p) => Themes.red.base.saturate(0.5)};
-    font-style: italic;
-  }
-  }
   &.highlighted {
-    background-color: ${(p) => p.theme.highlight};
+    background-color: ${(p) => p.theme.squareHighlighted};
+    transition: none;
   }
   &.selected {
-    background-color: ${(p) => p.theme.selection};
+    background-color: ${(p) => p.theme.squareSelected};
+    transition: none;
+  }
+  &.error {
+    background-color: ${(p) => p.theme.squareError};
+  }
+  &::after {
+    box-shadow: 0 0 8px ${(p) => p.theme.error};
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.1s ease-out;
+  }
+  &.error::after {
+    opacity: 1;
+  }
+  &.selected.error {
+    background-color: ${(p) => p.theme.squareSelectedError};
   }
 
   @keyframes fade-in {
@@ -115,8 +134,8 @@ export default function Square({
   return (
     <StyledSquare
       className={`square${selected ? " selected" : ""}${
-        highlighted ? " highlighted" : ""
-      }${error ? " error" : ""}`}
+        error ? " error" : highlighted ? " highlighted" : ""
+      }`}
       data-index={index}
     >
       {cursor}

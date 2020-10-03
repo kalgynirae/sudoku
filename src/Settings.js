@@ -6,6 +6,7 @@ export const INITIAL_SETTINGS = Map({
   automaticallyRemoveHints: true,
   highlightAffectedSquares: true,
   highlightErrors: true,
+  highlightLocked: false,
 });
 
 const SettingAction = {
@@ -44,6 +45,13 @@ export function Settings({ settings, dispatchSettings }) {
         dispatch={dispatchSettings}
       >
         Highlight errors
+      </Toggle>
+      <Toggle
+        name="highlightLocked"
+        settings={settings}
+        dispatch={dispatchSettings}
+      >
+        Highlight locked squares
       </Toggle>
     </SettingsList>
   );

@@ -21,39 +21,48 @@ export function Board({
     <BoardArea ref={boardAreaRef}>
       <BoardSizer>
         <BoardGrid onTouchMove={handleTouchMove}>
-          {renderBox(0, board, errors, selection, highlights)}
-          {renderBox(1, board, errors, selection, highlights)}
-          {renderBox(2, board, errors, selection, highlights)}
-          {renderBox(3, board, errors, selection, highlights)}
-          {renderBox(4, board, errors, selection, highlights)}
-          {renderBox(5, board, errors, selection, highlights)}
-          {renderBox(6, board, errors, selection, highlights)}
-          {renderBox(7, board, errors, selection, highlights)}
-          {renderBox(8, board, errors, selection, highlights)}
+          {renderBox(0, board, errors, selection, highlights, settings)}
+          {renderBox(1, board, errors, selection, highlights, settings)}
+          {renderBox(2, board, errors, selection, highlights, settings)}
+          {renderBox(3, board, errors, selection, highlights, settings)}
+          {renderBox(4, board, errors, selection, highlights, settings)}
+          {renderBox(5, board, errors, selection, highlights, settings)}
+          {renderBox(6, board, errors, selection, highlights, settings)}
+          {renderBox(7, board, errors, selection, highlights, settings)}
+          {renderBox(8, board, errors, selection, highlights, settings)}
         </BoardGrid>
       </BoardSizer>
     </BoardArea>
   );
 }
 
-function renderBox(i, board, errors, selection, highlights) {
+function renderBox(i, board, errors, selection, highlights, settings) {
   return (
     <Box>
-      {renderSquare(i, 0, board, errors, selection, highlights)}
-      {renderSquare(i, 1, board, errors, selection, highlights)}
-      {renderSquare(i, 2, board, errors, selection, highlights)}
-      {renderSquare(i, 3, board, errors, selection, highlights)}
-      {renderSquare(i, 4, board, errors, selection, highlights)}
-      {renderSquare(i, 5, board, errors, selection, highlights)}
-      {renderSquare(i, 6, board, errors, selection, highlights)}
-      {renderSquare(i, 7, board, errors, selection, highlights)}
-      {renderSquare(i, 8, board, errors, selection, highlights)}
+      {renderSquare(i, 0, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 1, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 2, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 3, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 4, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 5, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 6, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 7, board, errors, selection, highlights, settings)}
+      {renderSquare(i, 8, board, errors, selection, highlights, settings)}
     </Box>
   );
 }
 
-function renderSquare(ibox, isquare, board, errors, selection, highlights) {
+function renderSquare(
+  ibox,
+  isquare,
+  board,
+  errors,
+  selection,
+  highlights,
+  settings
+) {
   const i = indexbox(ibox, isquare);
+  const square = board.get(i);
   return (
     <Square
       index={i}
@@ -61,9 +70,11 @@ function renderSquare(ibox, isquare, board, errors, selection, highlights) {
       hasCursor={selection.usingCursor && selection.cursor === i}
       highlighted={highlights.includes(i)}
       selected={selection.squares.includes(i)}
-      number={board.get(i).get("number")}
-      corners={board.get(i).get("corners")}
-      centers={board.get(i).get("centers")}
+      locked={square.get("locked")}
+      number={square.get("number")}
+      corners={square.get("corners")}
+      centers={square.get("centers")}
+      settings={settings}
     />
   );
 }

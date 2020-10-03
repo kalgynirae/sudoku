@@ -1,9 +1,22 @@
 import { List, Map, Set, Range, Repeat, is } from "immutable";
 import { affectedBy, row, col, box } from "./Geometry.js";
 
-const INITIAL_BOARD = List(
-  Repeat(Map({ number: null, corners: Set(), centers: Set() }), 81)
-);
+export function createBoard(numbers) {
+  numbers = numbers ?? Repeat(null, 81);
+  if (numbers.size !== 81) {
+    throw new Error(`numbers had length ${numbers.length}; expected 81`);
+  }
+  return numbers
+    .map((number) =>
+      Map({
+        number: number,
+        corners: Set(),
+        centers: Set(),
+        locked: number !== null,
+      })
+    )
+    .toList();
+}
 
 export function anyContains(board, squares, type, digit) {
   return squares
@@ -12,6 +25,9 @@ export function anyContains(board, squares, type, digit) {
 }
 
 export function setNumber(settings, board, square, digit) {
+  if (board.getIn([square, "locked"])) {
+    return board;
+  }
   const affectedSquares = affectedBy(square);
   return board.withMutations((board) => {
     board.setIn([square, "number"], digit);
@@ -45,10 +61,12 @@ export function removePencilMark(board, squares, type, digit) {
   );
 }
 
-export const INITIAL_GAMESTATE = Map({
-  boards: List.of(INITIAL_BOARD),
-  index: 0,
-});
+export function createGamestate(initial_board) {
+  return Map({
+    boards: List.of(initial_board),
+    index: 0,
+  });
+}
 
 export function updateBoard(gamestate, updater) {
   const currentBoard = gamestate.getIn(["boards", gamestate.get("index")]);

@@ -1,6 +1,5 @@
 import React from "react";
 import styled from "styled-components";
-import { Themes } from "./Colors.js";
 
 const CORNER_GRID_AREA_SETS = {
   1: "a",
@@ -17,7 +16,7 @@ const CORNER_GRID_AREA_SETS = {
 const StyledSquare = styled.div`
   background-color: ${(p) => p.theme.square};
   position: relative;
-  transition: background-color 0.2s ease-out;
+  transition: background-color 0.1s ease-out;
   text-align: center;
 
   & > * {
@@ -54,6 +53,9 @@ const StyledSquare = styled.div`
   }
   &.selected.error {
     background-color: ${(p) => p.theme.squareSelectedError};
+  }
+  &.locked {
+    background-color: ${(p) => p.theme.squareLocked};
   }
 
   @keyframes fade-in {
@@ -109,6 +111,8 @@ export default function Square({
   index,
   number,
   selected,
+  locked,
+  settings,
 }) {
   let cursor = null;
   if (hasCursor) {
@@ -131,13 +135,21 @@ export default function Square({
     }
   }
 
+  const classes = [];
+  if (selected) {
+    classes.push("selected");
+  }
+  if (error) {
+    classes.push("error");
+  }
+  if (highlighted) {
+    classes.push("highlighted");
+  }
+  if (locked && settings.get("highlightLocked")) {
+    classes.push("locked");
+  }
   return (
-    <StyledSquare
-      className={`square${selected ? " selected" : ""}${
-        error ? " error" : highlighted ? " highlighted" : ""
-      }`}
-      data-index={index}
-    >
+    <StyledSquare className={`${classes.join(" ")}`} data-index={index}>
       {cursor}
       {number_or_hints}
     </StyledSquare>

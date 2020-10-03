@@ -12,9 +12,10 @@ import { ThemeProvider } from "styled-components";
 import {
   Action,
   Modes,
-  INITIAL_GAMESTATE,
   canRedo,
   canUndo,
+  createBoard,
+  createGamestate,
   getErrors,
   updateGamestate,
 } from "./Gamestate.js";
@@ -22,16 +23,21 @@ import { squareAt, neighbor } from "./Geometry.js";
 import { Board } from "./Board.js";
 import { Button, ButtonRow } from "./Buttons.js";
 import { Themes, ModeTheme } from "./Colors.js";
+import { decodeBoard, encodeBoard, copyBoardAsURL } from "./Loader.js";
 import { Settings, INITIAL_SETTINGS, updateSettings } from "./Settings.js";
 import styled, { createGlobalStyle } from "styled-components";
 import "normalize.css";
 import { Set } from "immutable";
 
+const searchParams = new URLSearchParams(window.location.search);
+const initialBoard = searchParams.has("board")
+  ? decodeBoard(searchParams.get("board"))
+  : createBoard(null);
+
 export default function App() {
   const [mode, setMode] = useState(Modes.normal);
-  const [gamestate, dispatchGamestate] = useReducer(
-    updateGamestate,
-    INITIAL_GAMESTATE
+  const [gamestate, dispatchGamestate] = useReducer(updateGamestate, null, () =>
+    createGamestate(initialBoard)
   );
   const [selection, setSelection] = useState({
     squares: [],
@@ -209,7 +215,10 @@ export default function App() {
         case "7":
         case "8":
         case "9":
-          inputDigit(Number(e.key).valueOf());
+          inputDigit(parseInt(e.key));
+          break;
+        case "Backspace":
+          inputDigit(null);
           break;
         default:
           console.log(`Unhandled keydown: ${e}`);
@@ -324,6 +333,27 @@ export default function App() {
         </ThemeProvider>
       </div>
       <Settings settings={settings} dispatchSettings={dispatchSettings} />
+      <p>
+        Current board: <tt>{encodeBoard(currentBoard)}</tt>
+      </p>
+      <Button onClick={() => copyBoardAsURL(currentBoard)}>
+        Copy current board URL
+      </Button>
+      <ol>
+        <li>
+          <a href="?">Empty puzzle</a>
+        </li>
+        <li>
+          <a href="?board=7.4..6..9.8..1......3.2.45.........2.56...78.1.........25.3.1......4..6.9..5..3.7">
+            #1
+          </a>
+        </li>
+        <li>
+          <a href="?board=....2.......738....5.4.6.7.1.......896.....41.8.6.1.2...25.71....9.8.7..3.......6">
+            #2
+          </a>
+        </li>
+      </ol>
     </ThemeProvider>
   );
 }
@@ -358,6 +388,10 @@ const GlobalStyle = createGlobalStyle`
 
   #root > * {
     flex-grow: 1;
+  }
+
+  a {
+    color: inherit;
   }
 `;
 

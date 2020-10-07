@@ -21,8 +21,8 @@ import {
 } from "./Gamestate.js";
 import { squareAt, neighbor } from "./Geometry.js";
 import { Board } from "./Board.js";
-import { Button, ButtonRow } from "./Buttons.js";
-import { Themes, ModeTheme } from "./Colors.js";
+import { Button, ButtonRow, FocusSelector } from "./Buttons.js";
+import { Themes, ModeTheme } from "./Theme.js";
 import { decodeBoard, encodeBoard, copyBoardAsURL } from "./Loader.js";
 import { Settings, INITIAL_SETTINGS, updateSettings } from "./Settings.js";
 import styled, { createGlobalStyle } from "styled-components";
@@ -54,7 +54,7 @@ export default function App() {
   //
   const currentBoard = gamestate.getIn(["boards", gamestate.get("index")]);
   const currentErrors = useMemo(
-    () => (settings.get("highlightErrors") ? getErrors(currentBoard) : Set()),
+    () => (settings.get("showErrors") ? getErrors(currentBoard) : Set()),
     [currentBoard, settings]
   );
 
@@ -360,18 +360,18 @@ export default function App() {
 
 const GlobalStyle = createGlobalStyle`
   :root {
-    --square-size: 4rem;
-    --button-hue: 120;
+    --border-radius: 10px;
     --font-serif: "Literata", serif;
     --font-sans: "Inter", sans-serif;
     --font-hint: "Inconsolata", monospace;
   }
 
   body {
-    background-color: ${(p) => p.theme.background};
-    color: ${(p) => p.theme.text};
+      background-color: ${(p) => p.theme.background};
+      color: ${(p) => p.theme.text};
     font-family: var(--font-sans);
     line-height: 1;
+    margin: 0;
   }
 
   .title {
@@ -388,6 +388,10 @@ const GlobalStyle = createGlobalStyle`
 
   #root > * {
     flex-grow: 1;
+    margin: 0 1rem;
+  }
+  #root > * + * {
+    margin-top: 1rem;
   }
 
   a {
@@ -399,19 +403,3 @@ const FlexRow = styled.div`
   display: flex;
   justify-content: center;
 `;
-
-function FocusSelector() {
-  return (
-    <ButtonRow>
-      <Button>1</Button>
-      <Button>2</Button>
-      <Button>3</Button>
-      <Button>4</Button>
-      <Button>5</Button>
-      <Button>6</Button>
-      <Button>7</Button>
-      <Button>8</Button>
-      <Button>9</Button>
-    </ButtonRow>
-  );
-}

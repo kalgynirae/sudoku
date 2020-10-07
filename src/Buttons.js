@@ -1,11 +1,12 @@
 import React from "react";
 import styled from "styled-components";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSearch } from "@fortawesome/free-solid-svg-icons";
 
 export const StyledButtonRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 0.5rem;
 
   & > * {
     flex: 0 0 auto;
@@ -18,6 +19,16 @@ export const StyledButtonRow = styled.div`
   &.large {
     font-size: 2em;
   }
+
+  & > :not(:last-child) {
+    border-right-width: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  & > :not(:first-child) {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
 `;
 
 export function ButtonRow({ children, large, stretch }) {
@@ -29,22 +40,25 @@ export function ButtonRow({ children, large, stretch }) {
   );
 }
 
-const StyledButton = styled.button`
-  background: linear-gradient(
-    to bottom,
-    ${(p) => p.theme.button} 30%,
-    ${(p) => p.theme.button.darken(0.2)} 100%
-  );
+const StyledButtonBase = styled.div`
+  background: ${(p) => p.theme.button.darken(0.4)};
   border: solid 1px black;
-  border-right-width: 0;
-  box-shadow: inset 0px 1px 0px ${(p) => p.theme.button.brighten(0.3)};
+  border-radius: var(--border-radius);
   color: ${(p) => p.theme.text};
   font-size: 1.5em;
   line-height: 1.8;
   padding: 0 0.5em;
   text-shadow: 1px 1px 0px black;
   touch-action: none;
+`;
 
+const StyledButton = styled(StyledButtonBase)`
+  background: linear-gradient(
+    to bottom,
+    ${(p) => p.theme.button} 30%,
+    ${(p) => p.theme.button.darken(0.2)} 100%
+  );
+  box-shadow: inset 0px 1px 0px ${(p) => p.theme.button.brighten(0.3)};
   &:hover {
     background: linear-gradient(
       to bottom,
@@ -66,14 +80,6 @@ const StyledButton = styled.button`
     box-shadow: none;
     color: gray;
   }
-
-  &:first-child {
-    border-radius: 10px 0 0 10px;
-  }
-  &:last-child {
-    border-right-width: 1px;
-    border-radius: 0 10px 10px 0;
-  }
 `;
 
 export function Button({
@@ -87,6 +93,7 @@ export function Button({
 }) {
   return (
     <StyledButton
+      as="button"
       className={`button${active ? " active" : ""}${large ? " large" : ""}${
         className ? ` ${className}` : ""
       }`}
@@ -95,5 +102,24 @@ export function Button({
     >
       {children}
     </StyledButton>
+  );
+}
+
+export function FocusSelector() {
+  return (
+    <ButtonRow>
+      <StyledButtonBase>
+        <FontAwesomeIcon icon={faSearch} size="sm" />
+      </StyledButtonBase>
+      <Button>1</Button>
+      <Button>2</Button>
+      <Button>3</Button>
+      <Button>4</Button>
+      <Button>5</Button>
+      <Button>6</Button>
+      <Button>7</Button>
+      <Button>8</Button>
+      <Button>9</Button>
+    </ButtonRow>
   );
 }

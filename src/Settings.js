@@ -5,8 +5,8 @@ import styled from "styled-components";
 export const INITIAL_SETTINGS = Map({
   automaticallyRemoveHints: true,
   highlightAffectedSquares: true,
-  highlightErrors: true,
-  highlightLocked: false,
+  showErrors: true,
+  showLocked: false,
 });
 
 const SettingAction = {
@@ -24,38 +24,63 @@ export function updateSettings(settings, { action, name }) {
 
 export function Settings({ settings, dispatchSettings }) {
   return (
-    <SettingsList>
-      <Toggle
-        name="automaticallyRemoveHints"
-        settings={settings}
-        dispatch={dispatchSettings}
-      >
-        Automatically remove hints
-      </Toggle>
-      <Toggle
-        name="highlightAffectedSquares"
-        settings={settings}
-        dispatch={dispatchSettings}
-      >
-        Highlight affected squares
-      </Toggle>
-      <Toggle
-        name="highlightErrors"
-        settings={settings}
-        dispatch={dispatchSettings}
-      >
-        Highlight errors
-      </Toggle>
-      <Toggle
-        name="highlightLocked"
-        settings={settings}
-        dispatch={dispatchSettings}
-      >
-        Highlight locked squares
-      </Toggle>
-    </SettingsList>
+    <SettingsFlex>
+      <SettingsGroup>
+        <legend>Gameplay</legend>
+        <SettingsUl>
+          <Toggle
+            name="automaticallyRemoveHints"
+            settings={settings}
+            dispatch={dispatchSettings}
+          >
+            Automatically remove hints
+          </Toggle>
+        </SettingsUl>
+      </SettingsGroup>
+      <SettingsGroup>
+        <legend>Display</legend>
+        <SettingsUl>
+          <Toggle
+            name="highlightAffectedSquares"
+            settings={settings}
+            dispatch={dispatchSettings}
+          >
+            Highlight affected squares
+          </Toggle>
+          <Toggle
+            name="showErrors"
+            settings={settings}
+            dispatch={dispatchSettings}
+          >
+            Highlight errors
+          </Toggle>
+          <Toggle
+            name="showLocked"
+            settings={settings}
+            dispatch={dispatchSettings}
+          >
+            Show locked squares
+          </Toggle>
+        </SettingsUl>
+      </SettingsGroup>
+    </SettingsFlex>
   );
 }
+
+const SettingsFlex = styled.div`
+  display: flex;
+`;
+
+const SettingsGroup = styled.fieldset`
+  border: 1px solid ${(p) => p.theme.border};
+  padding: 0 0.75rem;
+`;
+
+const SettingsUl = styled.ul`
+  line-height: 1.5;
+  list-style: none;
+  padding: 0;
+`;
 
 function Toggle({ children, name, settings, dispatch }) {
   return (
@@ -70,13 +95,6 @@ function Toggle({ children, name, settings, dispatch }) {
     </SettingsListItem>
   );
 }
-
-const SettingsList = styled.ul`
-  font-size: 1.2em;
-  line-height: 1.5;
-  list-style: none;
-  padding: 0 0.5rem;
-`;
 
 const SettingsListItem = styled.li`
   & > label {

@@ -1,6 +1,10 @@
 import { List, Map, Set, Range, Repeat, is } from "immutable";
 import { affectedBy, row, col, box } from "./Geometry.js";
 
+// TOOD: this is dead code, we just want to load it into the page
+// eslint-disable-next-line no-unused-vars
+import {RealtimeGamestate} from "./Realtime.ts";
+
 export function createBoard(numbers) {
   numbers = numbers ?? Repeat(null, 81);
   if (numbers.size !== 81) {

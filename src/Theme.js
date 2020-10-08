@@ -26,19 +26,23 @@ function makeTheme(base) {
   return theme;
 }
 
-export const Themes = {
-  red: makeTheme(chroma.lch(45, 35, 0)),
-  orange: makeTheme(chroma.lch(45, 35, 45)),
-  yellow: makeTheme(chroma.lch(45, 35, 90)),
-  green: makeTheme(chroma.lch(45, 35, 135)),
-  cyan: makeTheme(chroma.lch(45, 35, 180)),
-  blue: makeTheme(chroma.lch(45, 35, 225)),
-  indigo: makeTheme(chroma.lch(45, 35, 270)),
-  purple: makeTheme(chroma.lch(45, 35, 315)),
-};
-Themes.default = Themes.yellow;
+export const Themes = (() => {
+  const t = {
+    red: makeTheme(chroma.lch(45, 35, 0)),
+    orange: makeTheme(chroma.lch(45, 35, 45)),
+    yellow: makeTheme(chroma.lch(45, 35, 90)),
+    green: makeTheme(chroma.lch(45, 35, 135)),
+    cyan: makeTheme(chroma.lch(45, 35, 180)),
+    blue: makeTheme(chroma.lch(45, 35, 225)),
+    indigo: makeTheme(chroma.lch(45, 35, 270)),
+    purple: makeTheme(chroma.lch(45, 35, 315)),
+  };
+  t.default = t.yellow;
+  return t;
+})();
 
-export const ModeTheme = {};
-ModeTheme[Modes.normal] = Themes.green;
-ModeTheme[Modes.corners] = Themes.cyan;
-ModeTheme[Modes.centers] = Themes.blue;
+export const ModeTheme = {
+  [Modes.normal]: Themes.green,
+  [Modes.corners]: Themes.cyan,
+  [Modes.centers]: Themes.blue,
+};

@@ -1,8 +1,11 @@
 import React from "react";
 import styled from "styled-components";
 import { Set } from "immutable";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLock } from "@fortawesome/free-solid-svg-icons";
 
-import { indexbox, affectedBy } from "./Geometry.js";
+import { indexbox, affectedBy } from "./Geometry";
+import { squareIncludesDigit } from "./Gamestate";
 
 export function Board({
   children,
@@ -10,99 +13,67 @@ export function Board({
   boardAreaRef,
   board,
   errors,
+  focusDigit,
   selection,
   settings,
 }) {
-  const highlights = settings.get("highlightAffectedSquares")
+  const highlights = settings.get("highlightPeers")
     ? Set.intersect(selection.squares.map(affectedBy))
     : Set();
+
+  const boxes = [];
+  for (let ibox = 0; ibox < 9; ibox++) {
+    const squares = [];
+    for (let isquare = 0; isquare < 9; isquare++) {
+      const i = indexbox(ibox, isquare);
+      const square = board.get(i);
+      squares.push(
+        <Square
+          index={i}
+          isError={errors.includes(i)}
+          isFocused={squareIncludesDigit(square, focusDigit)}
+          isLocked={square.get("locked")}
+          isPeer={highlights.includes(i)}
+          isSelected={selection.squares.includes(i)}
+          hasCursor={selection.usingCursor && selection.cursor === i}
+          number={square.get("number")}
+          corners={square.get("corners")}
+          centers={square.get("centers")}
+          settings={settings}
+        />
+      );
+    }
+    boxes.push(<Box>{squares}</Box>);
+  }
+
   return (
-    <BoardArea ref={boardAreaRef}>
-      <BoardSizer>
-        <BoardGrid onTouchMove={handleTouchMove}>
-          {renderBox(0, board, errors, selection, highlights, settings)}
-          {renderBox(1, board, errors, selection, highlights, settings)}
-          {renderBox(2, board, errors, selection, highlights, settings)}
-          {renderBox(3, board, errors, selection, highlights, settings)}
-          {renderBox(4, board, errors, selection, highlights, settings)}
-          {renderBox(5, board, errors, selection, highlights, settings)}
-          {renderBox(6, board, errors, selection, highlights, settings)}
-          {renderBox(7, board, errors, selection, highlights, settings)}
-          {renderBox(8, board, errors, selection, highlights, settings)}
-        </BoardGrid>
-      </BoardSizer>
-    </BoardArea>
+    <BoardTouchArea ref={boardAreaRef}>
+      <BoardGrid onTouchMove={handleTouchMove}>{boxes}</BoardGrid>
+    </BoardTouchArea>
   );
 }
 
-function renderBox(i, board, errors, selection, highlights, settings) {
-  return (
-    <Box>
-      {renderSquare(i, 0, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 1, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 2, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 3, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 4, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 5, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 6, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 7, board, errors, selection, highlights, settings)}
-      {renderSquare(i, 8, board, errors, selection, highlights, settings)}
-    </Box>
-  );
-}
-
-function renderSquare(
-  ibox,
-  isquare,
-  board,
-  errors,
-  selection,
-  highlights,
-  settings
-) {
-  const i = indexbox(ibox, isquare);
-  const square = board.get(i);
-  return (
-    <Square
-      index={i}
-      error={errors.includes(i)}
-      hasCursor={selection.usingCursor && selection.cursor === i}
-      highlighted={highlights.includes(i)}
-      selected={selection.squares.includes(i)}
-      locked={square.get("locked")}
-      number={square.get("number")}
-      corners={square.get("corners")}
-      centers={square.get("centers")}
-      settings={settings}
-    />
-  );
-}
-
-const BoardArea = styled.div`
-  touch-action: none;
-`;
-
-const BoardSizer = styled.div`
+export const BoardSizer = styled.div`
   --box-gap: 4px;
   --square-gap: 2px;
-  --square-size: 4rem;
+  --square-size: 4em;
+  --board-size: calc(
+    9 * var(--square-size) + 6 * var(--square-gap) + 2 * var(--box-gap)
+  );
 
-  position: relative;
-  height: calc(
-    9 * var(--square-size) + 6 * var(--square-gap) + 2 * var(--box-gap)
-  );
-  width: calc(
-    9 * var(--square-size) + 6 * var(--square-gap) + 2 * var(--box-gap)
-  );
+  width: 100%;
   margin: 0 auto;
 `;
 
+const BoardTouchArea = styled.div`
+  padding-top: 1rem;
+  touch-action: none;
+`;
+
 const BoardGrid = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  width: var(--board-size);
+  height: var(--board-size);
+  margin: 0 auto;
 
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -138,13 +109,14 @@ const CORNER_GRID_AREA_SETS = {
 export default function Square({
   centers,
   corners,
-  error,
+  isError,
+  isFocused,
+  isLocked,
+  isPeer,
+  isSelected,
   hasCursor,
-  highlighted,
   index,
   number,
-  selected,
-  locked,
   settings,
 }) {
   let cursor = null;
@@ -164,21 +136,19 @@ export default function Square({
     }
   }
 
+  let lock = null;
+  if (isLocked && settings.get("showLocked")) {
+    lock = <Lock />;
+  }
+
   const classes = [];
-  if (selected) {
-    classes.push("selected");
-  }
-  if (error) {
-    classes.push("error");
-  }
-  if (highlighted) {
-    classes.push("highlighted");
-  }
-  if (locked && settings.get("showLocked")) {
-    classes.push("locked");
-  }
+  if (isSelected) classes.push("selected");
+  if (isError) classes.push("error");
+  if (isFocused) classes.push("focused");
+  if (isPeer) classes.push("highlighted");
   return (
     <StyledSquare className={`${classes.join(" ")}`} data-index={index}>
+      {lock}
       {cursor}
       {number_or_hints}
     </StyledSquare>
@@ -192,11 +162,15 @@ const StyledSquare = styled.div`
   text-align: center;
 
   & > * {
+    box-sizing: border-box;
     position: absolute;
     height: 100%;
     width: 100%;
   }
 
+  &.focused {
+    background-color: ${(p) => p.theme.square.brighten(0.3)};
+  }
   &.highlighted {
     background-color: ${(p) => p.theme.squareHighlighted};
     transition: none;
@@ -226,9 +200,6 @@ const StyledSquare = styled.div`
   &.selected.error {
     background-color: ${(p) => p.theme.squareSelectedError};
   }
-  &.locked {
-    background-color: ${(p) => p.theme.squareLocked};
-  }
 
   @keyframes fade-in {
     0% {
@@ -254,8 +225,23 @@ const StyledSquare = styled.div`
 
 const Cursor = styled.div`
   border: solid 1px ${(p) => p.theme.base.brighten(0.2)};
-  box-sizing: border-box;
 `;
+
+const StyledLock = styled.div`
+  color: ${(p) => p.theme.background};
+  padding: 0.2em;
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+`;
+function Lock() {
+  return (
+    <StyledLock>
+      <FontAwesomeIcon icon={faLock} />
+    </StyledLock>
+  );
+}
 
 function Number({ children }) {
   return (

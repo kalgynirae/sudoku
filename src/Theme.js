@@ -36,8 +36,9 @@ export const Themes = (() => {
     blue: makeTheme(chroma.lch(45, 35, 225)),
     indigo: makeTheme(chroma.lch(45, 35, 270)),
     purple: makeTheme(chroma.lch(45, 35, 315)),
+    gray: makeTheme(chroma.lch(45, 0, 0)),
   };
-  t.default = t.yellow;
+  t.default = t.gray;
   return t;
 })();
 

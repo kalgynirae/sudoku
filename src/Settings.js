@@ -4,7 +4,7 @@ import styled from "styled-components";
 
 export const INITIAL_SETTINGS = Map({
   automaticallyRemoveHints: true,
-  highlightAffectedSquares: true,
+  highlightPeers: true,
   showErrors: true,
   showLocked: false,
 });
@@ -41,18 +41,18 @@ export function Settings({ settings, dispatchSettings }) {
         <legend>Display</legend>
         <SettingsUl>
           <Toggle
-            name="highlightAffectedSquares"
+            name="highlightPeers"
             settings={settings}
             dispatch={dispatchSettings}
           >
-            Highlight affected squares
+            Highlight peers
           </Toggle>
           <Toggle
             name="showErrors"
             settings={settings}
             dispatch={dispatchSettings}
           >
-            Highlight errors
+            Show errors
           </Toggle>
           <Toggle
             name="showLocked"

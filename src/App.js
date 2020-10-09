@@ -7,7 +7,7 @@ import React, {
   useState,
 } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBackspace, faRedo, faUndo } from "@fortawesome/free-solid-svg-icons";
+import { faBackspace } from "@fortawesome/free-solid-svg-icons";
 import { ThemeProvider } from "styled-components";
 import {
   Action,
@@ -20,8 +20,8 @@ import {
   updateGamestate,
 } from "./Gamestate.js";
 import { squareAt, neighbor } from "./Geometry.js";
-import { Board } from "./Board.js";
-import { Button, ButtonRow, FocusSelector } from "./Buttons.js";
+import { Board, BoardSizer } from "./Board.js";
+import { Button, ButtonRow, TopControls } from "./Buttons.js";
 import { Themes, ModeTheme } from "./Theme.js";
 import { decodeBoard, encodeBoard, copyBoardAsURL } from "./Loader.js";
 import { Settings, INITIAL_SETTINGS, updateSettings } from "./Settings.js";
@@ -36,6 +36,7 @@ const initialBoard = searchParams.has("board")
 
 export default function App() {
   const [mode, setMode] = useState(Modes.normal);
+  const [focusDigit, setFocusDigit] = useState(null);
   const [gamestate, dispatchGamestate] = useReducer(updateGamestate, null, () =>
     createGamestate(initialBoard)
   );
@@ -256,35 +257,26 @@ export default function App() {
   return (
     <ThemeProvider theme={Themes.default}>
       <GlobalStyle />
-      <FlexRow>
-        <FocusSelector />
-        <ThemeProvider theme={Themes.red}>
-          <ButtonRow>
-            <Button
-              onClick={() => dispatchGamestate({ action: Action.undo })}
-              enabled={canUndo(gamestate)}
-            >
-              <FontAwesomeIcon icon={faUndo} size="sm" />
-            </Button>
-            <Button
-              onClick={() => dispatchGamestate({ action: Action.redo })}
-              enabled={canRedo(gamestate)}
-            >
-              <FontAwesomeIcon icon={faRedo} size="sm" />
-            </Button>
-          </ButtonRow>
-        </ThemeProvider>
-      </FlexRow>
-      <ThemeProvider theme={ModeTheme[mode]}>
-        <Board
-          boardAreaRef={boardArea}
-          handleTouchMove={handleTouchMove}
-          board={currentBoard}
-          errors={currentErrors}
-          selection={selection}
-          settings={settings}
+      <BoardSizer>
+        <TopControls
+          canRedo={canRedo(gamestate)}
+          canUndo={canUndo(gamestate)}
+          dispatchGamestate={dispatchGamestate}
+          focusDigit={focusDigit}
+          setFocusDigit={setFocusDigit}
         />
-      </ThemeProvider>
+        <ThemeProvider theme={ModeTheme[mode]}>
+          <Board
+            boardAreaRef={boardArea}
+            handleTouchMove={handleTouchMove}
+            board={currentBoard}
+            errors={currentErrors}
+            focusDigit={focusDigit}
+            selection={selection}
+            settings={settings}
+          />
+        </ThemeProvider>
+      </BoardSizer>
       <div>
         <ButtonRow stretch>
           <ThemeProvider theme={ModeTheme[Modes.normal]}>
@@ -367,8 +359,8 @@ const GlobalStyle = createGlobalStyle`
   }
 
   body {
-      background-color: ${(p) => p.theme.background};
-      color: ${(p) => p.theme.text};
+    background-color: ${(p) => p.theme.background};
+    color: ${(p) => p.theme.text};
     font-family: var(--font-sans);
     line-height: 1;
     margin: 0;
@@ -397,9 +389,4 @@ const GlobalStyle = createGlobalStyle`
   a {
     color: inherit;
   }
-`;
-
-const FlexRow = styled.div`
-  display: flex;
-  justify-content: center;
 `;

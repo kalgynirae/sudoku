@@ -35,6 +35,8 @@ export function setNumber(settings, board, square, digit) {
   const affectedSquares = affectedBy(square);
   return board.withMutations((board) => {
     board.setIn([square, "number"], digit);
+    clearPencilMarks(board, List.of(square), "corners");
+    clearPencilMarks(board, List.of(square), "centers");
     if (settings.get("automaticallyRemoveHints")) {
       removePencilMark(board, affectedSquares, "corners", digit);
       removePencilMark(board, affectedSquares, "centers", digit);
@@ -190,4 +192,12 @@ export function getErrors(board) {
     });
   });
   return errorSquares.asImmutable();
+}
+
+export function squareIncludesDigit(square, digit) {
+  return digit === null
+    ? false
+    : square.get("number") === digit ||
+        square.get("corners").includes(digit) ||
+        square.get("centers").includes(digit);
 }

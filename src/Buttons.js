@@ -1,7 +1,10 @@
 import React from "react";
-import styled from "styled-components";
+import styled, { ThemeProvider } from "styled-components";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faRedo, faUndo } from "@fortawesome/free-solid-svg-icons";
+import { Range } from "immutable";
+import { Action } from "./Gamestate";
+import { Themes } from "./Theme";
 
 export const StyledButtonRow = styled.div`
   display: flex;
@@ -9,7 +12,7 @@ export const StyledButtonRow = styled.div`
   justify-content: center;
 
   & > * {
-    flex: 0 0 auto;
+    flex: 1 0 0;
   }
 
   &.stretch > * {
@@ -41,15 +44,21 @@ export function ButtonRow({ children, large, stretch }) {
 }
 
 const StyledButtonBase = styled.div`
-  background: ${(p) => p.theme.button.darken(0.4)};
+  background: ${(p) => p.theme.button.set("lch.c", 0)};
   border: solid 1px black;
   border-radius: var(--border-radius);
-  color: ${(p) => p.theme.text};
+  box-shadow: inset 0 1px 0 0 ${(p) => p.theme.button.brighten(0.3)};
+  color: inherit;
   font-size: 1.5em;
   line-height: 1.8;
-  padding: 0 0.5em;
+  padding: 0 0.4em;
   text-shadow: 1px 1px 0px black;
   touch-action: none;
+`;
+
+const StyledButtonLabel = styled(StyledButtonBase)`
+  color: ${(p) => p.theme.background};
+  flex: 0 1 0;
 `;
 
 const StyledButton = styled(StyledButtonBase)`
@@ -58,7 +67,6 @@ const StyledButton = styled(StyledButtonBase)`
     ${(p) => p.theme.button} 30%,
     ${(p) => p.theme.button.darken(0.2)} 100%
   );
-  box-shadow: inset 0px 1px 0px ${(p) => p.theme.button.brighten(0.3)};
   &:hover {
     background: linear-gradient(
       to bottom,
@@ -70,15 +78,19 @@ const StyledButton = styled(StyledButtonBase)`
   &.active {
     background: linear-gradient(
       to bottom,
-      ${(p) => p.theme.button.darken(0.2)} 20%,
-      ${(p) => p.theme.button.darken(0.1)} 100%
+      ${(p) => p.theme.button.darken(0.3)} 20%,
+      ${(p) => p.theme.button.darken(0.15)} 100%
     );
-    box-shadow: inset 0px 0px 1px ${(p) => p.theme.button.brighten(1)};
+    box-shadow: inset 0 0 1px 0 ${(p) => p.theme.button.brighten(1.5)};
   }
   &:disabled {
     background: ${(props) => props.theme.button.desaturate(1)};
     box-shadow: none;
     color: gray;
+  }
+
+  & > svg {
+    filter: drop-shadow(1px 1px 0 black);
   }
 `;
 
@@ -105,21 +117,84 @@ export function Button({
   );
 }
 
-export function FocusSelector() {
+const StyledFocusSelector = styled.div`
+  width: 30em;
+`;
+
+function FocusSelector({ focusDigit, setFocusDigit }) {
+  const buttons = Range(1, 10).map((i) => (
+    <Button
+      active={focusDigit === i}
+      onClick={() =>
+        focusDigit === i ? setFocusDigit(null) : setFocusDigit(i)
+      }
+    >
+      {i}
+    </Button>
+  ));
   return (
-    <ButtonRow>
-      <StyledButtonBase>
-        <FontAwesomeIcon icon={faSearch} size="sm" />
-      </StyledButtonBase>
-      <Button>1</Button>
-      <Button>2</Button>
-      <Button>3</Button>
-      <Button>4</Button>
-      <Button>5</Button>
-      <Button>6</Button>
-      <Button>7</Button>
-      <Button>8</Button>
-      <Button>9</Button>
-    </ButtonRow>
+    <StyledFocusSelector>
+      <ButtonRow>
+        <StyledButtonLabel>
+          <FontAwesomeIcon icon={faSearch} size="sm" />
+        </StyledButtonLabel>
+        {buttons}
+      </ButtonRow>
+    </StyledFocusSelector>
+  );
+}
+
+const StyledUndoRedo = styled.div`
+  width: 6em;
+`;
+
+export function UndoRedo({ dispatchGamestate, canUndo, canRedo }) {
+  return (
+    <StyledUndoRedo>
+      <ButtonRow>
+        <Button
+          onClick={() => dispatchGamestate({ action: Action.undo })}
+          enabled={canUndo}
+        >
+          <FontAwesomeIcon icon={faUndo} size="sm" />
+        </Button>
+        <Button
+          onClick={() => dispatchGamestate({ action: Action.redo })}
+          enabled={canRedo}
+        >
+          <FontAwesomeIcon icon={faRedo} size="sm" />
+        </Button>
+      </ButtonRow>
+    </StyledUndoRedo>
+  );
+}
+
+const StyledTopControls = styled.div`
+  display: flex;
+  justify-content: space-between;
+  width: var(--board-size);
+  margin: 0 auto;
+`;
+
+export function TopControls({
+  canRedo,
+  canUndo,
+  dispatchGamestate,
+  focusDigit,
+  setFocusDigit,
+}) {
+  return (
+    <StyledTopControls>
+      <ThemeProvider theme={Themes.gray}>
+        <FocusSelector focusDigit={focusDigit} setFocusDigit={setFocusDigit} />
+      </ThemeProvider>
+      <ThemeProvider theme={Themes.red}>
+        <UndoRedo
+          dispatchGamestate={dispatchGamestate}
+          canUndo={canUndo}
+          canRedo={canRedo}
+        />
+      </ThemeProvider>
+    </StyledTopControls>
   );
 }

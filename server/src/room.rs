@@ -8,7 +8,11 @@ use crate::board::{BoardDiff, BoardState};
 const MAX_SESSIONS_PER_ROOM: usize = 32;
 // If we exhaust this queue size and the websocket buffer, the client has lagged, and we should
 // send them a FullUpdate next time.
-const MAX_BOARD_DIFF_QUEUE: usize = 32;
+const MAX_BOARD_DIFF_GROUP_QUEUE: usize = 32;
+// The client's high-level operations can be applied as a group of diffs. This needs to be larger
+// than the largest possible set of diffs that can be generated when handling a high-level
+// operation.
+const MAX_BOARD_DIFF_GROUP_SIZE: usize = 8;
 
 pub type RoomId = u64;
 pub type BoardId = u64;
@@ -28,7 +32,7 @@ pub struct Session {
 }
 
 pub struct BoardDiffBroadcast {
-    pub board_diff: BoardDiff,
+    pub board_diffs: Vec<BoardDiff>,
     // these allow the sender to identify it's own messages and use that to update the current
     // sync_id.
     pub sender_id: SessionId,
@@ -49,7 +53,7 @@ pub struct RoomState {
 
 impl RoomState {
     pub fn new(room_id: u64) -> RoomState {
-        let (diff_tx, _diff_rx) = broadcast::channel(MAX_BOARD_DIFF_QUEUE);
+        let (diff_tx, _diff_rx) = broadcast::channel(MAX_BOARD_DIFF_GROUP_QUEUE);
         RoomState {
             room_id: room_id,
             board_id: 0,
@@ -71,15 +75,20 @@ impl RoomState {
         })
     }
 
-    pub fn apply_diff(
+    pub fn apply_diffs(
         &mut self,
         session_id: SessionId,
         sync_id: ClientSyncId,
-        board_diff: BoardDiff,
+        board_diffs: Vec<BoardDiff>,
     ) -> Result<(), &'static str> {
-        self.board.apply(&board_diff)?;
+        if board_diffs.len() > MAX_BOARD_DIFF_GROUP_SIZE {
+            return Err("too many board diffs in single request");
+        }
+        for bd in board_diffs.iter() {
+            self.board.apply(bd)?;
+        }
         let broadcast = BoardDiffBroadcast {
-            board_diff: board_diff,
+            board_diffs: board_diffs,
             sender_id: session_id,
             sync_id: sync_id,
         };

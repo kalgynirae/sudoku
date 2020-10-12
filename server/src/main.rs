@@ -29,7 +29,7 @@ enum ResponseMessage {
     #[serde(rename_all = "camelCase")]
     PartialUpdate {
         sync_id: Option<ClientSyncId>,
-        diff: BoardDiff,
+        diffs: Vec<BoardDiff>,
     },
     /// Sent when the client falls too far behind (RecvError::Lagged)
     #[allow(dead_code)]
@@ -51,9 +51,9 @@ enum RequestMessage {
     #[serde(rename_all = "camelCase")]
     SetBoardState { board_state: BoardState },
     #[serde(rename_all = "camelCase")]
-    ApplyDiff {
+    ApplyDiffs {
         sync_id: ClientSyncId,
-        diff: BoardDiff,
+        diffs: Vec<BoardDiff>,
     },
 }
 
@@ -75,9 +75,9 @@ async fn handle_request_message(
             room_state.lock().await.board = board_state.clone();
             None
         }
-        RequestMessage::ApplyDiff { sync_id, diff } => {
+        RequestMessage::ApplyDiffs { sync_id, diffs } => {
             let mut rs = room_state.lock().await;
-            if let Err(err) = rs.apply_diff(session_id, sync_id, diff) {
+            if let Err(err) = rs.apply_diffs(session_id, sync_id, diffs) {
                 Some(ResponseMessage::Error {
                     sync_id: Some(sync_id),
                     message: err,
@@ -214,7 +214,7 @@ async fn handle_realtime_api(ws: WebSocket, room_state: Arc<Mutex<RoomState>>) {
                 };
                 let msg = ResponseMessage::PartialUpdate {
                     sync_id: current_sync_id,
-                    diff: diff_broadcast.board_diff.clone(),
+                    diffs: diff_broadcast.board_diffs.clone(),
                 };
                 if let Err(_) = write_response_to_socket(&ws_tx, &msg).await {
                     break;
@@ -326,14 +326,14 @@ async fn main() {
     // TODO: Delete: Testing serialization
     debug!(
         "{}",
-        serde_json::to_string(&RequestMessage::ApplyDiff {
+        serde_json::to_string(&RequestMessage::ApplyDiffs {
             sync_id: 20,
-            diff: BoardDiff {
+            diffs: vec![BoardDiff {
                 squares: vec![1, 2],
                 operation: BoardDiffOperation::SetNumber {
                     digit: Some(Digit::D5),
                 },
-            }
+            }],
         })
         .unwrap()
     );

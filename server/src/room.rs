@@ -27,7 +27,6 @@ pub type ClientSyncId = u64;
 
 pub struct Session {
     pub session_id: SessionId,
-    pub sync_id: Option<ClientSyncId>,
     pub diff_rx: broadcast::Receiver<Arc<BoardDiffBroadcast>>,
 }
 
@@ -70,9 +69,14 @@ impl RoomState {
         self.session_counter += 1;
         Ok(Session {
             session_id: self.session_counter,
-            sync_id: None,
             diff_rx: self.diff_tx.subscribe(),
         })
+    }
+
+    // creates a broadcast::Receiver without creating a new session. Useful for resetting the
+    // receiver in an already-existing session.
+    pub fn new_sessionless_receiver(&self) -> broadcast::Receiver<Arc<BoardDiffBroadcast>> {
+        self.diff_tx.subscribe()
     }
 
     pub fn apply_diffs(

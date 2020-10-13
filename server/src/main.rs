@@ -10,13 +10,14 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 use tokio::sync::Mutex;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
 
 use crate::board::{BoardDiff, BoardDiffOperation, BoardState};
 use crate::digit::Digit;
-use crate::room::{ClientSyncId, RoomId, RoomState, Session, SessionId};
+use crate::room::{BoardDiffBroadcast, ClientSyncId, RoomId, RoomState, Session, SessionId};
 
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -39,10 +40,13 @@ enum ResponseMessage {
         board_state: BoardState,
     },
     #[serde(rename_all = "camelCase")]
-    Error {
-        sync_id: Option<ClientSyncId>,
-        message: &'static str,
-    },
+    Error { message: &'static str },
+}
+
+impl From<Result<ResponseMessage, &'static str>> for ResponseMessage {
+    fn from(result: Result<ResponseMessage, &'static str>) -> ResponseMessage {
+        result.unwrap_or_else(|err| ResponseMessage::Error { message: err })
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -68,20 +72,19 @@ async fn handle_request_message(
     room_state: Arc<Mutex<RoomState>>,
     session_id: SessionId,
     req: RequestMessage,
+    last_received_sync_id: &Mutex<Option<ClientSyncId>>,
 ) -> Option<ResponseMessage> {
     match req {
         RequestMessage::SetBoardState { board_state } => {
-            // TODO: store sync_id
             room_state.lock().await.board = board_state.clone();
             None
         }
         RequestMessage::ApplyDiffs { sync_id, diffs } => {
             let mut rs = room_state.lock().await;
+            let mut last_received_sync_id_guard = last_received_sync_id.lock().await;
+            *last_received_sync_id_guard = Some(sync_id);
             if let Err(err) = rs.apply_diffs(session_id, sync_id, diffs) {
-                Some(ResponseMessage::Error {
-                    sync_id: Some(sync_id),
-                    message: err,
-                })
+                Some(ResponseMessage::Error { message: err })
             } else {
                 None
             }
@@ -93,29 +96,66 @@ async fn handle_web_socket_message(
     room_state: Arc<Mutex<RoomState>>,
     session_id: SessionId,
     ws_message: &Message,
-) -> Result<Option<ResponseMessage>, &'static str> {
-    Ok(if ws_message.is_text() {
-        let body = ws_message.to_str().or(Err("internal error"))?;
+    last_received_sync_id: &Mutex<Option<ClientSyncId>>,
+) -> Option<ResponseMessage> {
+    if let Ok(body) = ws_message.to_str() {
         debug!("received text messsage from client: {}", body);
-        handle_request_message(
-            room_state,
-            session_id,
-            serde_json::from_str::<RequestMessage>(body).or(Err("bad request"))?,
-        )
-        .await
+        match serde_json::from_str::<RequestMessage>(body) {
+            Ok(req) => {
+                handle_request_message(room_state, session_id, req, last_received_sync_id).await
+            }
+            Err(_) => Some(ResponseMessage::Error {
+                message: "bad request",
+            }),
+        }
     } else if ws_message.is_binary() {
         debug!("received unsupported binary message from client");
-        Err("messages must be JSON-encoded text, not binary blobs")?
+        Some(ResponseMessage::Error {
+            message: "messages must be JSON-encoded text, not binary blobs",
+        })
     } else {
         None
-    })
+    }
 }
 
-/*async fn handle_diff_broadcast(
-    last_read_sync_id: &Mutex<ClientSyncId>,
-    last_sent_sync_id: &Mutex<ClientSyncId>,
-) -> Result<ResponseMessage, &'static str> {
-}*/
+async fn handle_diff_broadcast(
+    room_state: &Mutex<RoomState>,
+    broadcast: Result<Arc<BoardDiffBroadcast>, broadcast::RecvError>,
+    broadcast_rx: &mut broadcast::Receiver<Arc<BoardDiffBroadcast>>,
+    session_id: SessionId,
+    last_received_sync_id: &Mutex<Option<ClientSyncId>>,
+    last_sent_sync_id: &Mutex<Option<ClientSyncId>>,
+) -> Option<ResponseMessage> {
+    match broadcast {
+        Ok(bc) => {
+            let mut sync_id_guard = last_sent_sync_id.lock().await;
+            if bc.sender_id == session_id {
+                *sync_id_guard = Some(bc.sync_id);
+            }
+            Some(ResponseMessage::PartialUpdate {
+                sync_id: *sync_id_guard,
+                diffs: bc.board_diffs.clone(),
+            })
+        }
+        Err(broadcast::RecvError::Lagged(_)) => {
+            let (mut last_sent_sync_id_guard, last_received_sync_id_guard, room_state_guard) = tokio::join!(
+                last_sent_sync_id.lock(),
+                last_received_sync_id.lock(),
+                room_state.lock()
+            );
+            *last_sent_sync_id_guard = *last_received_sync_id_guard;
+            *broadcast_rx = room_state_guard.new_sessionless_receiver();
+            Some(ResponseMessage::FullUpdate {
+                sync_id: *last_received_sync_id_guard,
+                board_state: room_state_guard.board.clone(),
+            })
+        }
+        Err(broadcast::RecvError::Closed) => {
+            warn!("broadcast channel is closed; this shouldn't happen");
+            None
+        }
+    }
+}
 
 async fn handle_realtime_api(ws: WebSocket, room_state: Arc<Mutex<RoomState>>) {
     let (ws_tx, ws_rx) = ws.split();
@@ -125,24 +165,18 @@ async fn handle_realtime_api(ws: WebSocket, room_state: Arc<Mutex<RoomState>>) {
     // create a new session and prepare it to be shared across multiple tasks
     let Session {
         session_id,
-        sync_id,
         mut diff_rx,
     } = match room_state.lock().await.new_session() {
         Ok(session) => session,
         Err(err) => {
-            let _possible_error = write_response_to_socket(
-                &ws_tx,
-                &ResponseMessage::Error {
-                    sync_id: None,
-                    message: err,
-                },
-            )
-            .await;
+            let _possible_error =
+                write_response_to_socket(&ws_tx, ResponseMessage::Error { message: err }).await;
             close_websocket(ws_tx, ws_rx).await;
             return;
         }
     };
-    let sync_id = Arc::new(Mutex::new(sync_id));
+    let last_received_sync_id: Arc<Mutex<Option<ClientSyncId>>> = Arc::new(Mutex::new(None));
+    let last_sent_sync_id: Arc<Mutex<Option<ClientSyncId>>> = Arc::new(Mutex::new(None));
 
     debug!("sending init message to client");
     let init_msg = {
@@ -155,7 +189,7 @@ async fn handle_realtime_api(ws: WebSocket, room_state: Arc<Mutex<RoomState>>) {
             board_state: rs.board.clone(),
         }
     };
-    let write_result = write_response_to_socket(&ws_tx, &init_msg).await;
+    let write_result = write_response_to_socket(&ws_tx, init_msg).await;
 
     if write_result.is_err() {
         debug!("failed to send init message, so closing socket instead");
@@ -166,57 +200,55 @@ async fn handle_realtime_api(ws: WebSocket, room_state: Arc<Mutex<RoomState>>) {
     let request_receiver = {
         let ws_tx = ws_tx.clone();
         let ws_rx = ws_rx.clone();
-        let sync_id = sync_id.clone();
+        let last_received_sync_id = last_received_sync_id.clone();
+        let room_state = room_state.clone();
         async move {
-            while let Some(msg) = ws_rx.lock().await.next().await {
-                let msg = match msg {
+            while let Some(request) = ws_rx.lock().await.next().await {
+                let request = match request {
                     Ok(val) => val,
                     Err(err) => {
                         warn!("error reading from socket: {}", err);
                         break;
                     }
                 };
-                if msg.is_close() {
+                if request.is_close() {
                     return;
                 }
-
-                let response =
-                    match handle_web_socket_message(room_state.clone(), session_id, &msg).await {
-                        Ok(r) => r,
-                        Err(err) => Some(ResponseMessage::Error {
-                            sync_id: *sync_id.lock().await,
-                            message: &err,
-                        }),
-                    };
-                match response {
-                    Some(msg) => {
-                        if let Err(_) = write_response_to_socket(&ws_tx, &msg).await {
-                            break;
-                        }
-                    }
-                    None => {}
-                };
+                let response = handle_web_socket_message(
+                    room_state.clone(),
+                    session_id,
+                    &request,
+                    &last_received_sync_id,
+                )
+                .await;
+                if write_response_to_socket(&ws_tx, response).await.is_err() {
+                    break;
+                }
             }
         }
     };
 
     let broadcast_receiver = {
         let ws_tx = ws_tx.clone();
-        let sync_id = sync_id.clone();
+        let last_received_sync_id = last_received_sync_id.clone();
+        let last_sent_sync_id = last_sent_sync_id.clone();
+        let room_state = room_state.clone();
         async move {
-            while let Ok(diff_broadcast) = diff_rx.recv().await {
-                let current_sync_id = {
-                    let mut sync_id_guard = sync_id.lock().await;
-                    if diff_broadcast.sender_id == session_id {
-                        *sync_id_guard = Some(diff_broadcast.sync_id);
-                    }
-                    *sync_id_guard
-                };
-                let msg = ResponseMessage::PartialUpdate {
-                    sync_id: current_sync_id,
-                    diffs: diff_broadcast.board_diffs.clone(),
-                };
-                if let Err(_) = write_response_to_socket(&ws_tx, &msg).await {
+            loop {
+                let diff_broadcast = diff_rx.recv().await;
+                if let Err(broadcast::RecvError::Closed) = diff_broadcast {
+                    return;
+                }
+                let response = handle_diff_broadcast(
+                    &room_state,
+                    diff_broadcast,
+                    &mut diff_rx,
+                    session_id,
+                    &last_received_sync_id,
+                    &last_sent_sync_id,
+                )
+                .await;
+                if write_response_to_socket(&ws_tx, response).await.is_err() {
                     break;
                 }
             }
@@ -231,16 +263,18 @@ async fn handle_realtime_api(ws: WebSocket, room_state: Arc<Mutex<RoomState>>) {
     close_websocket(ws_tx, ws_rx).await;
 }
 
-async fn write_response_to_socket(
+async fn write_response_to_socket<R: Into<Option<ResponseMessage>>>(
     ws_tx: &Mutex<SplitSink<WebSocket, Message>>,
-    msg: &ResponseMessage,
+    msg: R,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let response_str = serde_json::to_string(msg)?;
-    debug!("sending response to client: {}", response_str);
-    let write_result = ws_tx.lock().await.send(Message::text(response_str)).await;
-    if let Err(err) = write_result {
-        warn!("got an error upon writing to socket: {}", err);
-        Err(err)?;
+    if let Some(msg) = msg.into() {
+        let response_str = serde_json::to_string(&msg)?;
+        debug!("sending response to client: {}", response_str);
+        let write_result = ws_tx.lock().await.send(Message::text(response_str)).await;
+        if let Err(err) = write_result {
+            warn!("got an error upon writing to socket: {}", err);
+            Err(err)?;
+        }
     }
     Ok(())
 }

@@ -49,12 +49,12 @@ type SetBoardStateRequestMessage = {
   type: "setBoardState";
   boardState: ServerBoardState;
 };
-type ApplyDiffRequestMessage = {
-  type: "applyDiff";
+type ApplyDiffsRequestMessage = {
+  type: "applyDiffs";
   syncId: number;
-  diff: BoardDiff;
+  diffs: BoardDiff[];
 };
-type RequestMessage = SetBoardStateRequestMessage | ApplyDiffRequestMessage;
+type RequestMessage = SetBoardStateRequestMessage | ApplyDiffsRequestMessage;
 
 type InitResponseMessage = {
   type: "init";
@@ -64,7 +64,7 @@ type InitResponseMessage = {
 type PartialUpdateResponseMessage = {
   type: "partialUpdate";
   syncId: number;
-  diff: BoardDiff;
+  diffs: BoardDiff[];
 };
 type ResponseMessage = InitResponseMessage | PartialUpdateResponseMessage;
 
@@ -134,7 +134,7 @@ function applyDiffOperationToSquare(
     // TODO: Implement other operations
     default:
       throw new Error(
-        `Tried to applyDiff of invalid operation type: ${operation.fn}`
+        `Tried call applyDiffs with invalid operation type: ${operation.fn}`
       );
   }
 }
@@ -165,12 +165,16 @@ class LocalBoardState {
     return this.squares === squares ? this : new LocalBoardState(squares);
   }
 
-  applyDiff(diff: BoardDiff): LocalBoardState {
+  applyDiffs(diffs: BoardDiff[]): LocalBoardState {
     return this.createMemo(
-      diff.squares.reduce(
-        (boardSquares, diffSquareIdx) =>
-          boardSquares.update(diffSquareIdx, (boardSquare) =>
-            applyDiffOperationToSquare(boardSquare, diff.operation)
+      diffs.reduce(
+        (squares, d) =>
+          d.squares.reduce(
+            (boardSquares, diffSquareIdx) =>
+              boardSquares.update(diffSquareIdx, (boardSquare) =>
+                applyDiffOperationToSquare(boardSquare, d.operation)
+              ),
+            this.squares
           ),
         this.squares
       )
@@ -198,18 +202,18 @@ abstract class BaseGameState {
     );
   }
 
-  abstract applyDiff(diff: BoardDiff): void;
+  abstract applyDiffs(diffs: BoardDiff[]): void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 class LocalGameState extends BaseGameState {
   private boardStateStack: LocalBoardState[] = [];
 
-  applyDiff(diff: BoardDiff): void {
+  applyDiffs(diffs: BoardDiff[]): void {
     const prevBoardState = this.boardStateStack[
       this.boardStateStack.length - 1
     ];
-    const newBoardState = prevBoardState.applyDiff(diff);
+    const newBoardState = prevBoardState.applyDiffs(diffs);
     if (newBoardState !== prevBoardState) {
       this.boardStateStack.push(newBoardState);
       this.triggerBoardStateUpdate(newBoardState);
@@ -224,9 +228,9 @@ class RemoteGameState extends BaseGameState {
   private clientBoardState: LocalBoardState = LocalBoardState.empty();
   // the diffs that make up the difference between the server's board state and
   // the client's
-  private unconfirmedDiffs: BoardDiff[] = [];
+  private unconfirmedDiffGroups: BoardDiff[][] = [];
   // sync IDs are used to figure out what diffs we can remove from the
-  // unconfirmedDiffs queue
+  // unconfirmedDiffGroups queue
   private lastSentSyncId: number = 0;
   private lastReceivedSyncId: number = 0;
 
@@ -264,17 +268,21 @@ class RemoteGameState extends BaseGameState {
         if (this.serverBoardState == null) {
           throw new Error("got partialUpdate before init");
         }
-        this.serverBoardState = this.serverBoardState.applyDiff(msg.diff);
+        this.serverBoardState = this.serverBoardState.applyDiffs(msg.diffs);
 
-        // use syncId to update unconfirmedDiffs
+        // use syncId to update unconfirmedDiffGroups
         if (msg.syncId > this.lastReceivedSyncId) {
-          this.unconfirmedDiffs.splice(0, msg.syncId - this.lastReceivedSyncId);
+          this.unconfirmedDiffGroups.splice(
+            0,
+            msg.syncId - this.lastReceivedSyncId
+          );
         }
         this.lastReceivedSyncId = msg.syncId;
 
-        // apply unconfirmedDiffs to serverBoardState to get the new clientBoardState
-        const newClientBoardState = this.unconfirmedDiffs.reduce(
-          (st, df) => st.applyDiff(df),
+        // apply unconfirmedDiffGroups to serverBoardState to get the new
+        // clientBoardState
+        const newClientBoardState = this.unconfirmedDiffGroups.reduce(
+          (st, dfGrp) => st.applyDiffs(dfGrp),
           this.serverBoardState
         );
         // this will often differ by identity, but we should only trigger an
@@ -293,13 +301,13 @@ class RemoteGameState extends BaseGameState {
     }
   }
 
-  applyDiff(diff: BoardDiff): void {
-    const newClientBoardState = this.clientBoardState.applyDiff(diff);
-    this.unconfirmedDiffs.push(diff);
+  applyDiffs(diffs: BoardDiff[]): void {
+    const newClientBoardState = this.clientBoardState.applyDiffs(diffs);
+    this.unconfirmedDiffGroups.push(diffs);
     this.sendRequestMessage({
-      type: "applyDiff",
+      type: "applyDiffs",
       syncId: ++this.lastSentSyncId,
-      diff,
+      diffs,
     });
     if (newClientBoardState !== this.clientBoardState) {
       this.clientBoardState = newClientBoardState;

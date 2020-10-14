@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::board::{BoardDiff, BoardState};
+use crate::error::SudokuError;
 
 // We have to send O(n^2) messages per n clients, so set a cap to keep things sane.
 const MAX_SESSIONS_PER_ROOM: usize = 32;
@@ -62,9 +63,9 @@ impl RoomState {
         }
     }
 
-    pub fn new_session(&mut self) -> Result<Session, &'static str> {
+    pub fn new_session(&mut self) -> Result<Session, SudokuError> {
         if self.diff_tx.receiver_count() >= MAX_SESSIONS_PER_ROOM {
-            return Err("too many peers connected to this room");
+            return Err(SudokuError::RoomFull(MAX_SESSIONS_PER_ROOM));
         }
         self.session_counter += 1;
         Ok(Session {
@@ -84,9 +85,12 @@ impl RoomState {
         session_id: SessionId,
         sync_id: ClientSyncId,
         board_diffs: Vec<BoardDiff>,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), SudokuError> {
         if board_diffs.len() > MAX_BOARD_DIFF_GROUP_SIZE {
-            return Err("too many board diffs in single request");
+            return Err(SudokuError::TooManyBoardDiffs(
+                board_diffs.len(),
+                MAX_BOARD_DIFF_GROUP_SIZE,
+            ));
         }
         for bd in board_diffs.iter() {
             self.board.apply(bd)?;

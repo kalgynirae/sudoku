@@ -1,8 +1,9 @@
+import { faRedo, faSearch, faUndo } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { Range } from "immutable";
 import React from "react";
 import styled, { ThemeProvider } from "styled-components";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faRedo, faUndo } from "@fortawesome/free-solid-svg-icons";
-import { Range } from "immutable";
+
 import { Action } from "./Gamestate";
 import { Themes } from "./Theme";
 

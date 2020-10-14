@@ -1,5 +1,6 @@
-import { createBoard } from "./Gamestate.js";
 import { List } from "immutable";
+
+import { createBoard } from "./Gamestate.js";
 
 export function decodeBoard(encoded) {
   const numbers = List(encoded).map((char) => {

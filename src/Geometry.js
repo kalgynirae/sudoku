@@ -1,4 +1,4 @@
-import { Set, Range } from "immutable";
+import { Range, Set } from "immutable";
 
 export function squareAt(x, y) {
   let element = document.elementFromPoint(x, y);

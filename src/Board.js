@@ -1,11 +1,11 @@
+import { faLock } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { Set } from "immutable";
 import React from "react";
 import styled from "styled-components";
-import { Set } from "immutable";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLock } from "@fortawesome/free-solid-svg-icons";
 
-import { indexbox, affectedBy } from "./Geometry";
 import { squareIncludesDigit } from "./Gamestate";
+import { affectedBy, indexbox } from "./Geometry";
 
 export function Board({
   children,

@@ -1,3 +1,8 @@
+import "normalize.css";
+
+import { faBackspace } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { Set } from "immutable";
 import React, {
   useCallback,
   useEffect,
@@ -6,28 +11,30 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBackspace } from "@fortawesome/free-solid-svg-icons";
 import { ThemeProvider } from "styled-components";
+import { createGlobalStyle } from "styled-components";
+
+import { Board, BoardSizer } from "./Board.js";
+import { Button, ButtonRow, TopControls } from "./Buttons.js";
 import {
   Action,
-  Modes,
   canRedo,
   canUndo,
   createBoard,
   createGamestate,
   getErrors,
+  Modes,
   updateGamestate,
 } from "./Gamestate.js";
-import { squareAt, neighbor } from "./Geometry.js";
-import { Board, BoardSizer } from "./Board.js";
-import { Button, ButtonRow, TopControls } from "./Buttons.js";
-import { Themes, ModeTheme } from "./Theme.js";
-import { decodeBoard, encodeBoard, copyBoardAsURL } from "./Loader.js";
-import { Settings, INITIAL_SETTINGS, updateSettings } from "./Settings.js";
-import styled, { createGlobalStyle } from "styled-components";
-import "normalize.css";
-import { Set } from "immutable";
+import { squareAt } from "./Geometry.js";
+import { copyBoardAsURL, decodeBoard, encodeBoard } from "./Loader.js";
+import {
+  INITIAL_SELECTION,
+  SelectionActions,
+  updateSelection,
+} from "./Selection";
+import { INITIAL_SETTINGS, Settings, updateSettings } from "./Settings.js";
+import { ModeTheme, Themes } from "./Theme.js";
 
 const searchParams = new URLSearchParams(window.location.search);
 const initialBoard = searchParams.has("board")
@@ -40,11 +47,10 @@ export default function App() {
   const [gamestate, dispatchGamestate] = useReducer(updateGamestate, null, () =>
     createGamestate(initialBoard)
   );
-  const [selection, setSelection] = useState({
-    squares: [],
-    cursor: null,
-    usingCursor: false,
-  });
+  const [selection, dispatchSelection] = useReducer(
+    updateSelection,
+    INITIAL_SELECTION
+  );
   const [settings, dispatchSettings] = useReducer(
     updateSettings,
     INITIAL_SETTINGS
@@ -59,56 +65,16 @@ export default function App() {
     [currentBoard, settings]
   );
 
-  //
-  // SELECTION
-  //
-  const clearSelection = useCallback(() => {
-    setSelection((selection) => {
-      const newSelection = { ...selection };
-      newSelection.squares = [];
-      return newSelection;
-    });
-  }, []);
-
-  const selectSquare = useCallback((i) => {
-    console.log(`selectSquare(${i})`);
-    setSelection((selection) => {
-      if (selection.squares.includes(i)) {
-        return selection;
-      }
-      const newSelection = { ...selection };
-      newSelection.squares = [...selection.squares];
-      newSelection.squares.push(i);
-      newSelection.cursor = i;
-      newSelection.usingCursor = false;
-      return newSelection;
-    });
-  }, []);
-
-  const selectSquareAtCoordinates = useCallback(
-    (x, y) => {
-      console.log(`selectSquareAtCoordinates(${x}, ${y})`);
-      const i = squareAt(x, y);
-      if (i !== null) {
-        selectSquare(i);
-      }
-    },
-    [selectSquare]
-  );
-
-  const selectDirection = useCallback(
-    (direction) => {
-      setSelection((selection) => {
-        let i = neighbor(selection.cursor, direction) ?? selection.cursor;
-        const newSelection = { ...selection };
-        newSelection.squares = [...selection.squares, i];
-        newSelection.cursor = i;
-        newSelection.usingCursor = true;
-        return newSelection;
+  const selectSquareAtCoordinates = useCallback((x, y) => {
+    console.log(`selectSquareAtCoordinates(${x}, ${y})`);
+    const i = squareAt(x, y);
+    if (i !== null) {
+      dispatchSelection({
+        action: SelectionActions.selectSquare,
+        squareIndex: i,
       });
-    },
-    [setSelection]
-  );
+    }
+  }, []);
 
   //
   // ACTIONS
@@ -152,11 +118,11 @@ export default function App() {
       console.log(`handleTouchStart()`);
       e.preventDefault();
       if (e.touches.length === 1 && !e.ctrlKey) {
-        clearSelection();
+        dispatchSelection({ action: SelectionActions.clear });
       }
       selectTouchedSquares(e);
     },
-    [clearSelection, selectTouchedSquares]
+    [selectTouchedSquares]
   );
 
   //
@@ -166,11 +132,11 @@ export default function App() {
     (e) => {
       console.log(`handleMouseDown()`);
       if (!e.ctrlKey && !e.shiftKey) {
-        clearSelection();
+        dispatchSelection({ action: SelectionActions.clear });
       }
       selectSquareAtCoordinates(e.pageX, e.pageY);
     },
-    [clearSelection, selectSquareAtCoordinates]
+    [selectSquareAtCoordinates]
   );
 
   const handleMouseMove = useCallback(
@@ -186,20 +152,21 @@ export default function App() {
   //
   // KEYBOARD
   //
-  const moveCursor = useCallback(
-    (e) => {
-      if (!e.shiftKey && !e.ctrlKey) {
-        clearSelection();
-      }
-      selectDirection(e.key.substring(5).toLowerCase());
-    },
-    [clearSelection, selectDirection]
-  );
+  const moveCursor = useCallback((e) => {
+    if (!e.shiftKey && !e.ctrlKey) {
+      dispatchSelection({ action: SelectionActions.clear });
+    }
+    dispatchSelection({
+      action: SelectionActions.selectDirection,
+      direction: e.key.substring(5).toLowerCase(),
+    });
+  }, []);
+
   const handleKeyDown = useCallback(
     (e) => {
       switch (e.key) {
         case "Escape":
-          clearSelection();
+          dispatchSelection({ action: SelectionActions.clear });
           break;
         case "ArrowRight":
         case "ArrowLeft":
@@ -221,13 +188,18 @@ export default function App() {
         case "Backspace":
           inputDigit(null);
           break;
+        case "z":
+          if (canUndo) {
+            dispatchGamestate({ action: Action.undo });
+          }
+          break;
         default:
           console.log(`Unhandled keydown: ${e}`);
           return;
       }
       e.preventDefault();
     },
-    [clearSelection, inputDigit, moveCursor]
+    [inputDigit, moveCursor]
   );
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);

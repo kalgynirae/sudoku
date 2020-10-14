@@ -1,10 +1,11 @@
 mod board;
 mod digit;
+mod error;
 mod room;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
@@ -17,6 +18,7 @@ use warp::Filter;
 
 use crate::board::{BoardDiff, BoardDiffOperation, BoardState};
 use crate::digit::Digit;
+use crate::error::SudokuError;
 use crate::room::{BoardDiffBroadcast, ClientSyncId, RoomId, RoomState, Session, SessionId};
 
 #[derive(Serialize)]
@@ -40,12 +42,12 @@ enum ResponseMessage {
         board_state: BoardState,
     },
     #[serde(rename_all = "camelCase")]
-    Error { message: &'static str },
+    Error { message: SudokuError },
 }
 
-impl From<Result<ResponseMessage, &'static str>> for ResponseMessage {
-    fn from(result: Result<ResponseMessage, &'static str>) -> ResponseMessage {
-        result.unwrap_or_else(|err| ResponseMessage::Error { message: err })
+impl From<SudokuError> for ResponseMessage {
+    fn from(err: SudokuError) -> ResponseMessage {
+        ResponseMessage::Error { message: err }
     }
 }
 
@@ -104,15 +106,11 @@ async fn handle_web_socket_message(
             Ok(req) => {
                 handle_request_message(room_state, session_id, req, last_received_sync_id).await
             }
-            Err(_) => Some(ResponseMessage::Error {
-                message: "bad request",
-            }),
+            Err(err) => Some(SudokuError::SerdeJson(err).into()),
         }
     } else if ws_message.is_binary() {
         debug!("received unsupported binary message from client");
-        Some(ResponseMessage::Error {
-            message: "messages must be JSON-encoded text, not binary blobs",
-        })
+        Some(SudokuError::ReceivedBinaryMessage.into())
     } else {
         None
     }
@@ -125,17 +123,17 @@ async fn handle_diff_broadcast(
     session_id: SessionId,
     last_received_sync_id: &Mutex<Option<ClientSyncId>>,
     last_sent_sync_id: &Mutex<Option<ClientSyncId>>,
-) -> Option<ResponseMessage> {
+) -> ResponseMessage {
     match broadcast {
         Ok(bc) => {
             let mut sync_id_guard = last_sent_sync_id.lock().await;
             if bc.sender_id == session_id {
                 *sync_id_guard = Some(bc.sync_id);
             }
-            Some(ResponseMessage::PartialUpdate {
+            ResponseMessage::PartialUpdate {
                 sync_id: *sync_id_guard,
                 diffs: bc.board_diffs.clone(),
-            })
+            }
         }
         Err(broadcast::RecvError::Lagged(_)) => {
             let (mut last_sent_sync_id_guard, last_received_sync_id_guard, room_state_guard) = tokio::join!(
@@ -145,14 +143,14 @@ async fn handle_diff_broadcast(
             );
             *last_sent_sync_id_guard = *last_received_sync_id_guard;
             *broadcast_rx = room_state_guard.new_sessionless_receiver();
-            Some(ResponseMessage::FullUpdate {
+            ResponseMessage::FullUpdate {
                 sync_id: *last_received_sync_id_guard,
                 board_state: room_state_guard.board.clone(),
-            })
+            }
         }
         Err(broadcast::RecvError::Closed) => {
-            warn!("broadcast channel is closed; this shouldn't happen");
-            None
+            error!("broadcast channel is closed; this shouldn't happen");
+            SudokuError::Internal(broadcast::RecvError::Closed.into()).into()
         }
     }
 }
@@ -170,7 +168,7 @@ async fn handle_realtime_api(ws: WebSocket, room_state: Arc<Mutex<RoomState>>) {
         Ok(session) => session,
         Err(err) => {
             let _possible_error =
-                write_response_to_socket(&ws_tx, ResponseMessage::Error { message: err }).await;
+                write_response_to_socket(&ws_tx, ResponseMessage::from(err)).await;
             close_websocket(ws_tx, ws_rx).await;
             return;
         }
@@ -268,13 +266,20 @@ async fn write_response_to_socket<R: Into<Option<ResponseMessage>>>(
     msg: R,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     if let Some(msg) = msg.into() {
-        let response_str = serde_json::to_string(&msg)?;
+        let response_str = serde_json::to_string(&msg).map_err(|err| {
+            error!("failed to serialize response: {}", err);
+            err
+        })?;
         debug!("sending response to client: {}", response_str);
-        let write_result = ws_tx.lock().await.send(Message::text(response_str)).await;
-        if let Err(err) = write_result {
-            warn!("got an error upon writing to socket: {}", err);
-            Err(err)?;
-        }
+        ws_tx
+            .lock()
+            .await
+            .send(Message::text(response_str))
+            .await
+            .map_err(|err| {
+                warn!("got an error upon writing to socket: {}", err);
+                err
+            })?;
     }
     Ok(())
 }

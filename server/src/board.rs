@@ -1,5 +1,7 @@
-use crate::digit::{Digit, DigitBitFlags};
 use serde::{Deserialize, Serialize};
+
+use crate::digit::{Digit, DigitBitFlags};
+use crate::error::SudokuError;
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,15 +63,18 @@ pub struct BoardState {
 }
 
 impl BoardState {
-    pub fn apply(&mut self, diff: &BoardDiff) -> Result<(), &'static str> {
+    pub fn apply(&mut self, diff: &BoardDiff) -> Result<(), SudokuError> {
         if diff.squares.len() > self.squares.len() {
             // not strictly needed, but provide a sanity check
-            return Err("a diff can't contain more than 81 squares");
+            return Err(SudokuError::TooManySquares(
+                diff.squares.len(),
+                self.squares.len(),
+            ));
         }
         for sq_idx in &diff.squares {
             self.squares
                 .get_mut(*sq_idx as usize)
-                .ok_or("got invalid index")?
+                .ok_or(SudokuError::InvalidSquareIndex(*sq_idx as usize))?
                 .apply(&diff.operation);
         }
         Ok(())

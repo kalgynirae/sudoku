@@ -1,21 +1,28 @@
-import { is, List, Map, Range, Repeat, Set } from "immutable";
+import * as immutable from "immutable";
 
 import { affectedBy, box, col, row } from "./Geometry.js";
 // TOOD: this is dead code, we just want to load it into the page
 // eslint-disable-next-line no-unused-vars
 import { RealtimeGamestate } from "./Realtime.ts";
 
+const Square = immutable.Record({
+  number: null,
+  corners: immutable.Set(),
+  centers: immutable.Set(),
+  locked: false,
+});
+
 export function createBoard(numbers) {
-  numbers = numbers ?? Repeat(null, 81);
+  numbers = numbers ?? immutable.Repeat(null, 81);
   if (numbers.size !== 81) {
     throw new Error(`numbers had length ${numbers.length}; expected 81`);
   }
   return numbers
     .map((number) =>
-      Map({
+      Square({
         number: number,
-        corners: Set(),
-        centers: Set(),
+        corners: immutable.Set(),
+        centers: immutable.Set(),
         locked: number !== null,
       })
     )
@@ -35,9 +42,9 @@ export function setNumber(settings, board, square, digit) {
   const affectedSquares = affectedBy(square);
   return board.withMutations((board) => {
     board.setIn([square, "number"], digit);
-    clearPencilMarks(board, List.of(square), "corners");
-    clearPencilMarks(board, List.of(square), "centers");
-    if (settings.get("automaticallyRemoveHints")) {
+    clearPencilMarks(board, immutable.List.of(square), "corners");
+    clearPencilMarks(board, immutable.List.of(square), "centers");
+    if (settings.get("automaticallyRemoveMarks")) {
       removePencilMark(board, affectedSquares, "corners", digit);
       removePencilMark(board, affectedSquares, "centers", digit);
     }
@@ -54,7 +61,7 @@ export function addPencilMark(board, squares, type, digit) {
 
 export function clearPencilMarks(board, squares, type) {
   return squares.reduce(
-    (board, square) => board.setIn([square, type], Set()),
+    (board, square) => board.setIn([square, type], immutable.Set()),
     board
   );
 }
@@ -67,29 +74,28 @@ export function removePencilMark(board, squares, type, digit) {
   );
 }
 
+const Gamestate = immutable.Record({
+  boards: immutable.List.of(createBoard(null)),
+  index: 0,
+});
+
 export function createGamestate(initial_board) {
-  return Map({
-    boards: List.of(initial_board),
-    index: 0,
-  });
+  return Gamestate({ boards: immutable.List.of(initial_board) });
 }
 
 export function updateBoard(gamestate, updater) {
-  const currentBoard = gamestate.getIn(["boards", gamestate.get("index")]);
+  const currentBoard = gamestate.boards.get(gamestate.index);
   const newBoard = updater(currentBoard);
-  if (is(newBoard, currentBoard)) {
+  if (immutable.is(newBoard, currentBoard)) {
     return gamestate;
   }
   return gamestate.merge({
-    boards: gamestate
-      .get("boards")
-      .slice(0, gamestate.get("index") + 1)
-      .push(newBoard),
-    index: gamestate.get("index") + 1,
+    boards: gamestate.boards.slice(0, gamestate.index + 1).push(newBoard),
+    index: gamestate.index + 1,
   });
 }
 
-function undo(gamestate) {
+function undo(gamestate, settings) {
   return canUndo(gamestate)
     ? gamestate.update("index", (i) => i - 1)
     : gamestate;
@@ -102,11 +108,11 @@ function redo(gamestate) {
 }
 
 export function canUndo(gamestate) {
-  return gamestate.get("index") > 0;
+  return gamestate.index > 0;
 }
 
 export function canRedo(gamestate) {
-  return gamestate.get("index") < gamestate.get("boards").size - 1;
+  return gamestate.index < gamestate.boards.size - 1;
 }
 
 export const Modes = {
@@ -119,27 +125,31 @@ export const Action = {
   input: "input",
   undo: "undo",
   redo: "redo",
+  clearSelection: "clearSelection",
+  selectSquares: "selectSquares",
+  deselectSquares: "deselectSquares",
+  selectDirection: "selectDirection",
 };
 
 export function updateGamestate(
   gamestate,
-  { action, mode, squares, digit, settings }
+  { mode, selection, settings, action, squares, digit, direction }
 ) {
   switch (action) {
     case Action.input:
       return updateBoard(gamestate, (board) => {
         if (
-          (mode === Modes.normal && squares.length === 1) ||
+          (mode === Modes.normal && selection.squares.size === 1) ||
           (mode === Modes.normal && digit === null)
         ) {
-          return setNumber(settings, board, squares[0], digit);
+          return setNumber(settings, board, selection.squares.first(), digit);
         } else if (
           mode === Modes.normal ||
           mode === Modes.corners ||
           mode === Modes.centers
         ) {
-          const incompleteSquares = squares.filter(
-            (s) => board.get(s).get("number") === null
+          const incompleteSquares = selection.squares.filter(
+            (s) => board.get(s).number === null
           );
           const effectiveMode = mode === Modes.normal ? Modes.corners : mode;
           if (digit === null) {
@@ -166,7 +176,7 @@ export function updateGamestate(
         }
       });
     case Action.undo:
-      return undo(gamestate);
+      return undo(gamestate, settings);
     case Action.redo:
       return redo(gamestate);
     default:
@@ -175,15 +185,15 @@ export function updateGamestate(
 }
 
 export function getErrors(board) {
-  const rows = Range(0, 9).map((r) => row(r));
-  const columns = Range(0, 9).map((c) => col(c));
-  const boxes = Range(0, 9).map((b) => box(b));
+  const rows = immutable.Range(0, 9).map((r) => row(r));
+  const columns = immutable.Range(0, 9).map((c) => col(c));
+  const boxes = immutable.Range(0, 9).map((b) => box(b));
   const sections = rows.concat(columns, boxes);
-  const errorSquares = Set().asMutable();
+  const errorSquares = immutable.Set().asMutable();
   sections.forEach((section) => {
-    const squareNumbers = Map(
-      section.map((s) => [s, board.getIn([s, "number"])])
-    ).filter((v) => v !== null);
+    const squareNumbers = immutable
+      .Map(section.map((s) => [s, board.get(s).number]))
+      .filter((v) => v !== null);
     const numberCounts = squareNumbers.countBy((number) => number);
     squareNumbers.forEach((number, s) => {
       if (numberCounts.get(number) > 1) {
@@ -197,7 +207,7 @@ export function getErrors(board) {
 export function squareIncludesDigit(square, digit) {
   return digit === null
     ? false
-    : square.get("number") === digit ||
-        square.get("corners").includes(digit) ||
-        square.get("centers").includes(digit);
+    : square.number === digit ||
+        square.corners.includes(digit) ||
+        square.centers.includes(digit);
 }

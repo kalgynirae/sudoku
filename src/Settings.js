@@ -1,11 +1,12 @@
-import { Map } from "immutable";
+import * as immutable from "immutable";
 import React from "react";
 import styled from "styled-components";
 
-export const INITIAL_SETTINGS = Map({
-  automaticallyRemoveHints: true,
+export const INITIAL_SETTINGS = immutable.Map({
+  automaticallyRemoveMarks: false,
+  highlightAffectedMarks: true,
   highlightPeers: true,
-  showErrors: true,
+  showConflicts: true,
   showLocked: false,
 });
 
@@ -26,33 +27,14 @@ export function Settings({ settings, dispatchSettings }) {
   return (
     <SettingsFlex>
       <SettingsGroup>
-        <legend>Gameplay</legend>
-        <SettingsUl>
-          <Toggle
-            name="automaticallyRemoveHints"
-            settings={settings}
-            dispatch={dispatchSettings}
-          >
-            Automatically remove hints
-          </Toggle>
-        </SettingsUl>
-      </SettingsGroup>
-      <SettingsGroup>
         <legend>Display</legend>
         <SettingsUl>
           <Toggle
-            name="highlightPeers"
+            name="showConflicts"
             settings={settings}
             dispatch={dispatchSettings}
           >
-            Highlight peers
-          </Toggle>
-          <Toggle
-            name="showErrors"
-            settings={settings}
-            dispatch={dispatchSettings}
-          >
-            Show errors
+            Show conflicts
           </Toggle>
           <Toggle
             name="showLocked"
@@ -60,6 +42,37 @@ export function Settings({ settings, dispatchSettings }) {
             dispatch={dispatchSettings}
           >
             Show locked squares
+          </Toggle>
+        </SettingsUl>
+      </SettingsGroup>
+      <SettingsGroup>
+        <legend>Pencil Marks</legend>
+        <SettingsUl>
+          <Toggle
+            name="automaticallyRemoveMarks"
+            settings={settings}
+            dispatch={dispatchSettings}
+          >
+            Automatically remove marks
+          </Toggle>
+          <Toggle
+            name="highlightAffectedMarks"
+            settings={settings}
+            dispatch={dispatchSettings}
+          >
+            Highlight affected marks (doesn't work yet)
+          </Toggle>
+        </SettingsUl>
+      </SettingsGroup>
+      <SettingsGroup>
+        <legend>Selection</legend>
+        <SettingsUl>
+          <Toggle
+            name="highlightPeers"
+            settings={settings}
+            dispatch={dispatchSettings}
+          >
+            Highlight peers
           </Toggle>
         </SettingsUl>
       </SettingsGroup>

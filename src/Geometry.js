@@ -1,4 +1,4 @@
-import { Range, Set } from "immutable";
+import * as immutable from "immutable";
 
 export function squareAt(x, y) {
   let element = document.elementFromPoint(x, y);
@@ -40,55 +40,59 @@ export function indexbox(ibox, isquare) {
 }
 
 export function row(n) {
-  return Range(9 * n, 9 * n + 9);
+  return immutable.Range(9 * n, 9 * n + 9);
 }
 
 export function col(n) {
-  return Range(n, 81, 9);
+  return immutable.Range(n, 81, 9);
 }
 
 export function box(n) {
   const boxrow = Math.floor(n / 3);
   const boxcol = n % 3;
   const base = 27 * boxrow + 3 * boxcol;
-  return Range(base, base + 3).concat(
-    Range(base + 9, base + 9 + 3),
-    Range(base + 18, base + 18 + 3)
-  );
+  return immutable
+    .Range(base, base + 3)
+    .concat(
+      immutable.Range(base + 9, base + 9 + 3),
+      immutable.Range(base + 18, base + 18 + 3)
+    );
 }
 
 export function rowOf(s) {
   const row = Math.floor(s / 9);
-  return Set(Range(9 * row, 9 * row + 9));
+  return immutable.Set(immutable.Range(9 * row, 9 * row + 9));
 }
 
 export function colOf(s) {
   const col = s % 9;
-  return Set(Range(col, 81, 9));
+  return immutable.Set(immutable.Range(col, 81, 9));
 }
 
 export function boxOf(s) {
   const boxrow = Math.floor(Math.floor(s / 9) / 3);
   const boxcol = Math.floor((s % 9) / 3);
-  return Set(
-    Range(3 * boxrow, 3 * (boxrow + 1)).flatMap((row) =>
-      Range(9 * row + 3 * boxcol, 9 * row + 3 * (boxcol + 1))
-    )
+  return immutable.Set(
+    immutable
+      .Range(3 * boxrow, 3 * (boxrow + 1))
+      .flatMap((row) =>
+        immutable.Range(9 * row + 3 * boxcol, 9 * row + 3 * (boxcol + 1))
+      )
   );
 }
 
 export function affectedBy(s) {
-  return Set.union([rowOf(s), colOf(s), boxOf(s)]);
+  return immutable.Set.union([rowOf(s), colOf(s), boxOf(s)]);
 }
 
 export function rows() {
-  return Range(0, 81, 9).map((s) => row(s));
+  return immutable.Range(0, 81, 9).map((s) => row(s));
 }
 
 export function cols() {
-  return Range(0, 9).map((s) => col(s));
+  return immutable.Range(0, 9).map((s) => col(s));
 }
 
 export function boxes() {
-  return Range(0, 2);
+  return immutable.Range(0, 2);
 }

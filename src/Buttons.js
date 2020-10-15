@@ -1,10 +1,11 @@
 import { faRedo, faSearch, faUndo } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Range } from "immutable";
+import * as immutable from "immutable";
 import React from "react";
 import styled, { ThemeProvider } from "styled-components";
 
 import { Action } from "./Gamestate";
+import { SelectionAction } from "./Selection";
 import { Themes } from "./Theme";
 
 export const StyledButtonRow = styled.div`
@@ -102,7 +103,6 @@ export function Button({
   enabled,
   large,
   onClick,
-  theme,
 }) {
   return (
     <StyledButton
@@ -122,12 +122,15 @@ const StyledFocusSelector = styled.div`
   width: 30em;
 `;
 
-function FocusSelector({ focusDigit, setFocusDigit }) {
-  const buttons = Range(1, 10).map((i) => (
+function FocusSelector({ selection, dispatchSelection }) {
+  const buttons = immutable.Range(1, 10).map((i) => (
     <Button
-      active={focusDigit === i}
+      active={selection.focusDigit === i}
       onClick={() =>
-        focusDigit === i ? setFocusDigit(null) : setFocusDigit(i)
+        dispatchSelection({
+          action: SelectionAction.focus,
+          digit: selection.focusDigit === i ? null : i,
+        })
       }
     >
       {i}
@@ -181,13 +184,16 @@ export function TopControls({
   canRedo,
   canUndo,
   dispatchGamestate,
-  focusDigit,
-  setFocusDigit,
+  selection,
+  dispatchSelection,
 }) {
   return (
     <StyledTopControls>
       <ThemeProvider theme={Themes.gray}>
-        <FocusSelector focusDigit={focusDigit} setFocusDigit={setFocusDigit} />
+        <FocusSelector
+          selection={selection}
+          dispatchSelection={dispatchSelection}
+        />
       </ThemeProvider>
       <ThemeProvider theme={Themes.red}>
         <UndoRedo

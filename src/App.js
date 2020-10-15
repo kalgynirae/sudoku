@@ -2,7 +2,7 @@ import "normalize.css";
 
 import { faBackspace } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Set } from "immutable";
+import * as immutable from "immutable";
 import React, {
   useCallback,
   useEffect,
@@ -14,8 +14,8 @@ import React, {
 import { ThemeProvider } from "styled-components";
 import { createGlobalStyle } from "styled-components";
 
-import { Board, BoardSizer } from "./Board.js";
-import { Button, ButtonRow, TopControls } from "./Buttons.js";
+import { Board, BoardSizer } from "./Board";
+import { Button, ButtonRow, TopControls } from "./Buttons";
 import {
   Action,
   canRedo,
@@ -25,16 +25,12 @@ import {
   getErrors,
   Modes,
   updateGamestate,
-} from "./Gamestate.js";
-import { squareAt } from "./Geometry.js";
-import { copyBoardAsURL, decodeBoard, encodeBoard } from "./Loader.js";
-import {
-  INITIAL_SELECTION,
-  SelectionActions,
-  updateSelection,
-} from "./Selection";
-import { INITIAL_SETTINGS, Settings, updateSettings } from "./Settings.js";
-import { ModeTheme, Themes } from "./Theme.js";
+} from "./Gamestate";
+import { squareAt } from "./Geometry";
+import { copyBoardAsURL, decodeBoard, encodeBoard } from "./Loader";
+import { Selection, SelectionAction, updateSelection } from "./Selection";
+import { INITIAL_SETTINGS, Settings, updateSettings } from "./Settings";
+import { ModeTheme, Themes } from "./Theme";
 
 const searchParams = new URLSearchParams(window.location.search);
 const initialBoard = searchParams.has("board")
@@ -42,36 +38,48 @@ const initialBoard = searchParams.has("board")
   : createBoard(null);
 
 export default function App() {
-  const [mode, setMode] = useState(Modes.normal);
-  const [focusDigit, setFocusDigit] = useState(null);
-  const [gamestate, dispatchGamestate] = useReducer(updateGamestate, null, () =>
-    createGamestate(initialBoard)
+  const [gamestate, realDispatchGamestate] = useReducer(
+    updateGamestate,
+    null,
+    () => createGamestate(initialBoard)
   );
+  const [mode, setMode] = useState(Modes.normal);
   const [selection, dispatchSelection] = useReducer(
     updateSelection,
-    INITIAL_SELECTION
+    Selection()
   );
   const [settings, dispatchSettings] = useReducer(
     updateSettings,
     INITIAL_SETTINGS
   );
 
+  const dispatchGamestate = useCallback(
+    (params) =>
+      realDispatchGamestate({
+        mode: mode,
+        selection: selection,
+        settings: settings,
+        ...params,
+      }),
+    [mode, selection, settings]
+  );
+
   //
   // STATE
   //
-  const currentBoard = gamestate.getIn(["boards", gamestate.get("index")]);
+  const currentBoard = gamestate.boards.get(gamestate.index);
   const currentErrors = useMemo(
-    () => (settings.get("showErrors") ? getErrors(currentBoard) : Set()),
+    () =>
+      settings.get("showConflicts") ? getErrors(currentBoard) : immutable.Set(),
     [currentBoard, settings]
   );
 
   const selectSquareAtCoordinates = useCallback((x, y) => {
-    console.log(`selectSquareAtCoordinates(${x}, ${y})`);
     const i = squareAt(x, y);
     if (i !== null) {
       dispatchSelection({
-        action: SelectionActions.selectSquare,
-        squareIndex: i,
+        action: SelectionAction.addSquare,
+        square: i,
       });
     }
   }, []);
@@ -81,16 +89,14 @@ export default function App() {
   //
   const inputDigit = useCallback(
     (digit) => {
-      console.log(`inputDigit(${digit})`);
       dispatchGamestate({
         action: Action.input,
-        squares: selection.squares,
         digit: digit,
         mode: mode,
         settings: settings,
       });
     },
-    [mode, selection, settings]
+    [dispatchGamestate, mode, settings]
   );
 
   //
@@ -99,7 +105,7 @@ export default function App() {
   const selectTouchedSquares = useCallback(
     (e) => {
       for (let touch of e.changedTouches) {
-        selectSquareAtCoordinates(touch.pageX, touch.pageY);
+        selectSquareAtCoordinates(touch.clientX, touch.clientY);
       }
     },
     [selectSquareAtCoordinates]
@@ -107,7 +113,6 @@ export default function App() {
 
   const handleTouchMove = useCallback(
     (e) => {
-      console.log(`handleTouchMove()`);
       selectTouchedSquares(e);
     },
     [selectTouchedSquares]
@@ -115,10 +120,9 @@ export default function App() {
 
   const handleTouchStart = useCallback(
     (e) => {
-      console.log(`handleTouchStart()`);
       e.preventDefault();
       if (e.touches.length === 1 && !e.ctrlKey) {
-        dispatchSelection({ action: SelectionActions.clear });
+        dispatchSelection({ action: SelectionAction.clear });
       }
       selectTouchedSquares(e);
     },
@@ -130,9 +134,8 @@ export default function App() {
   //
   const handleMouseDown = useCallback(
     (e) => {
-      console.log(`handleMouseDown()`);
       if (!e.ctrlKey && !e.shiftKey) {
-        dispatchSelection({ action: SelectionActions.clear });
+        dispatchSelection({ action: SelectionAction.clear });
       }
       selectSquareAtCoordinates(e.pageX, e.pageY);
     },
@@ -141,7 +144,6 @@ export default function App() {
 
   const handleMouseMove = useCallback(
     (e) => {
-      console.log(`handleMouseMove()`);
       if (e.buttons === 1) {
         selectSquareAtCoordinates(e.pageX, e.pageY);
       }
@@ -154,10 +156,10 @@ export default function App() {
   //
   const moveCursor = useCallback((e) => {
     if (!e.shiftKey && !e.ctrlKey) {
-      dispatchSelection({ action: SelectionActions.clear });
+      dispatchSelection({ action: SelectionAction.clear });
     }
     dispatchSelection({
-      action: SelectionActions.selectDirection,
+      action: SelectionAction.addDirection,
       direction: e.key.substring(5).toLowerCase(),
     });
   }, []);
@@ -166,7 +168,7 @@ export default function App() {
     (e) => {
       switch (e.key) {
         case "Escape":
-          dispatchSelection({ action: SelectionActions.clear });
+          dispatchSelection({ action: SelectionAction.clear });
           break;
         case "ArrowRight":
         case "ArrowLeft":
@@ -188,6 +190,11 @@ export default function App() {
         case "Backspace":
           inputDigit(null);
           break;
+        case "x":
+          if (canRedo) {
+            dispatchGamestate({ action: Action.redo });
+          }
+          break;
         case "z":
           if (canUndo) {
             dispatchGamestate({ action: Action.undo });
@@ -199,7 +206,7 @@ export default function App() {
       }
       e.preventDefault();
     },
-    [inputDigit, moveCursor]
+    [dispatchGamestate, inputDigit, moveCursor]
   );
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
@@ -234,8 +241,8 @@ export default function App() {
           canRedo={canRedo(gamestate)}
           canUndo={canUndo(gamestate)}
           dispatchGamestate={dispatchGamestate}
-          focusDigit={focusDigit}
-          setFocusDigit={setFocusDigit}
+          selection={selection}
+          dispatchSelection={dispatchSelection}
         />
         <ThemeProvider theme={ModeTheme[mode]}>
           <Board
@@ -243,7 +250,6 @@ export default function App() {
             handleTouchMove={handleTouchMove}
             board={currentBoard}
             errors={currentErrors}
-            focusDigit={focusDigit}
             selection={selection}
             settings={settings}
           />

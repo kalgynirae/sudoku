@@ -1,6 +1,6 @@
 import { faLock } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Set } from "immutable";
+import * as immutable from "immutable";
 import React from "react";
 import styled from "styled-components";
 
@@ -13,13 +13,12 @@ export function Board({
   boardAreaRef,
   board,
   errors,
-  focusDigit,
   selection,
   settings,
 }) {
   const highlights = settings.get("highlightPeers")
-    ? Set.intersect(selection.squares.map(affectedBy))
-    : Set();
+    ? immutable.Set.intersect(selection.squares.map(affectedBy))
+    : immutable.Set();
 
   const boxes = [];
   for (let ibox = 0; ibox < 9; ibox++) {
@@ -31,7 +30,7 @@ export function Board({
         <Square
           index={i}
           isError={errors.includes(i)}
-          isFocused={squareIncludesDigit(square, focusDigit)}
+          isFocused={squareIncludesDigit(square, selection.focusDigit)}
           isLocked={square.get("locked")}
           isPeer={highlights.includes(i)}
           isSelected={selection.squares.includes(i)}

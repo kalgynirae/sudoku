@@ -1,48 +1,55 @@
-import { Record } from "immutable";
+import * as immutable from "immutable";
 
 import { neighbor } from "./Geometry";
 
-export const Selection = Record;
-
-export const SelectionActions = {
-  clear: "clear",
-  revert: "revert",
-  selectDirection: "selectDirection",
-  selectSquare: "selectSquare",
-};
-
-export const INITIAL_SELECTION = {
-  squares: [],
-  previousSquares: null,
+export const Selection = immutable.Record({
   cursor: null,
+  focusDigit: null,
+  squares: immutable.Set(),
   usingCursor: false,
+});
+
+export const SelectionAction = {
+  clear: "clear",
+  addSquare: "addSquare",
+  removeSquare: "removeSquare",
+  addDirection: "addDirection",
+  focus: "focus",
 };
 
-export function updateSelection(selection, { action, direction, squareIndex }) {
-  const newSelection = { ...selection };
+export function updateSelection(
+  selection,
+  { action, square, direction, digit }
+) {
   switch (action) {
-    case SelectionActions.clear:
-      newSelection.squares = [];
-      return newSelection;
-    case SelectionActions.revert:
-      if (selection.previousSquares === null) return selection;
-      newSelection.squares = selection.previousSquares;
-      newSelection.previousSquares = null;
-      return newSelection;
-    case SelectionActions.selectSquare:
-      if (selection.squares.includes(squareIndex)) return selection;
-      newSelection.previousSquares = null;
-      newSelection.squares = [...selection.squares];
-      newSelection.squares.push(squareIndex);
-      newSelection.cursor = squareIndex;
-      newSelection.usingCursor = false;
-      return newSelection;
-    case SelectionActions.selectDirection:
+    case SelectionAction.clear:
+      return selection.set("squares", immutable.Set());
+    case SelectionAction.addSquare:
+      return selection.merge({
+        cursor: square,
+        squares: selection.squares.add(square),
+        usingCursor: false,
+      });
+    case SelectionAction.removeSquare:
+      return selection.merge({
+        cursor: square,
+        squares: selection.squares.remove(square),
+      });
+    case SelectionAction.addDirection:
       let i = neighbor(selection.cursor, direction) ?? selection.cursor;
-      newSelection.squares = [...selection.squares, i];
-      newSelection.cursor = i;
-      newSelection.usingCursor = true;
-      return newSelection;
+      return selection.merge({
+        squares: selection.squares.add(i),
+        cursor: i,
+        usingCursor: true,
+      });
+    case SelectionAction.focus:
+      return selection.withMutations((selection) => {
+        selection.set("focusDigit", digit);
+        if (digit !== null) {
+          selection.set("squares", immutable.Set());
+        }
+      });
     default:
+      throw new Error(`Invalid action: ${action}`);
   }
 }

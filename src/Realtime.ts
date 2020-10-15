@@ -1,5 +1,7 @@
 import * as Immutable from "immutable";
 
+import { affectedBy } from "./Geometry.js";
+
 type ServerBoardSquare = {
   number: number | null;
   corners: number[];
@@ -13,8 +15,8 @@ type ServerBoardState = {
 
 type ValueOf<T> = T[keyof T];
 enum BoardPencilType {
-  Center = "center",
-  Corner = "corner",
+  Centers = "centers",
+  Corners = "corners",
 }
 
 type SetNumberOperation = {
@@ -33,6 +35,7 @@ type RemovePencilMarkOperation = {
 };
 type ClearPencilMarksOperation = {
   fn: "clearPencilMarks";
+  type: ValueOf<typeof BoardPencilType>;
 };
 type BoardDiffOperation =
   | SetNumberOperation
@@ -67,6 +70,13 @@ type PartialUpdateResponseMessage = {
   diffs: BoardDiff[];
 };
 type ResponseMessage = InitResponseMessage | PartialUpdateResponseMessage;
+
+function nullthrows<T>(value: T | null | undefined): T {
+  if (value == null) {
+    throw new Error("unexpected null value");
+  }
+  return value;
+}
 
 export class RealtimeApi {
   private responseMessageListeners: ((message: ResponseMessage) => void)[];
@@ -128,13 +138,21 @@ function applyDiffOperationToSquare(
   square: LocalBoardSquare,
   operation: BoardDiffOperation
 ): LocalBoardSquare {
+  if (square.get("locked")) {
+    return square;
+  }
   switch (operation.fn) {
     case "setNumber":
       return square.set("number", operation.digit);
-    // TODO: Implement other operations
+    case "addPencilMark":
+      return square.update(operation.type, (pm) => pm.add(operation.digit));
+    case "removePencilMark":
+      return square.update(operation.type, (pm) => pm.delete(operation.digit));
+    case "clearPencilMarks":
+      return square.set(operation.type, Immutable.Set());
     default:
       throw new Error(
-        `Tried call applyDiffs with invalid operation type: ${operation.fn}`
+        `Tried call applyDiffs with invalid operation: ${operation}`
       );
   }
 }
@@ -174,7 +192,7 @@ class LocalBoardState {
               boardSquares.update(diffSquareIdx, (boardSquare) =>
                 applyDiffOperationToSquare(boardSquare, d.operation)
               ),
-            this.squares
+            squares
           ),
         this.squares
       )
@@ -191,6 +209,22 @@ abstract class BaseGameState {
     }
   }
 
+  canUndo(): boolean {
+    return false;
+  }
+
+  canRedo(): boolean {
+    return false;
+  }
+
+  undo(): void {
+    throw Error("if canUndo is overridden, then undo should be overridden too");
+  }
+
+  redo(): void {
+    throw Error("if canRedo is overridden, then redo should be overridden too");
+  }
+
   // the listener will be called whenever the board state updates
   addBoardStateListener(listener: (boardState: LocalBoardState) => void) {
     this.boardStateListeners.push(listener);
@@ -203,21 +237,132 @@ abstract class BaseGameState {
   }
 
   abstract applyDiffs(diffs: BoardDiff[]): void;
+  abstract getBoardState(): LocalBoardState;
+
+  // high level APIs:
+  setNumber(
+    squareIdx: number,
+    digit: number | null,
+    options?: { automaticallyRemoveMarks?: boolean }
+  ): void {
+    options = { automaticallyRemoveMarks: false, ...(options ?? {}) };
+    // HACK: We shouldn't read the board state here. There's no risk of this
+    // behavior causing a desync, but this could still result in unexpected
+    // results.
+    if (nullthrows(this.getBoardState().squares.get(squareIdx)).get("locked")) {
+      return;
+    }
+    let diffs: BoardDiff[] = [
+      { squares: [squareIdx], operation: { fn: "setNumber", digit: digit } },
+    ];
+    if (digit != null) {
+      diffs.push(
+        {
+          squares: [squareIdx],
+          operation: { fn: "clearPencilMarks", type: BoardPencilType.Centers },
+        },
+        {
+          squares: [squareIdx],
+          operation: { fn: "clearPencilMarks", type: BoardPencilType.Corners },
+        }
+      );
+      if (options.automaticallyRemoveMarks) {
+        const affectedSquares = affectedBy(squareIdx).toJS();
+        diffs.push(
+          {
+            squares: affectedSquares,
+            operation: {
+              fn: "removePencilMark",
+              type: BoardPencilType.Centers,
+              digit,
+            },
+          },
+          {
+            squares: affectedSquares,
+            operation: {
+              fn: "removePencilMark",
+              type: BoardPencilType.Corners,
+              digit,
+            },
+          }
+        );
+      }
+    }
+    this.applyDiffs(diffs);
+  }
+
+  addPencilMark(squareIdxList: number[], type: BoardPencilType, digit: number) {
+    this.applyDiffs([
+      {
+        squares: squareIdxList,
+        operation: { fn: "addPencilMark", type, digit },
+      },
+    ]);
+  }
+
+  removePencilMark(
+    squareIdxList: number[],
+    type: BoardPencilType,
+    digit: number
+  ) {
+    this.applyDiffs([
+      {
+        squares: squareIdxList,
+        operation: { fn: "removePencilMark", type, digit },
+      },
+    ]);
+  }
+
+  clearPencilMarks(squareIdxList: number[], type: BoardPencilType) {
+    this.applyDiffs([
+      { squares: squareIdxList, operation: { fn: "clearPencilMarks", type } },
+    ]);
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 class LocalGameState extends BaseGameState {
-  private boardStateStack: LocalBoardState[] = [];
+  private boardStateStack: LocalBoardState[];
+  private boardStatePosition: number = 0;
+
+  constructor(startingBoardState: LocalBoardState) {
+    super();
+    this.boardStateStack = [startingBoardState];
+  }
+
+  canUndo(): boolean {
+    return this.boardStatePosition > 0;
+  }
+
+  canRedo(): boolean {
+    return this.boardStatePosition < this.boardStateStack.length;
+  }
+
+  undo() {
+    this.boardStatePosition--;
+    this.triggerBoardStateUpdate(this.boardStateStack[this.boardStatePosition]);
+  }
+
+  redo() {
+    this.boardStatePosition++;
+    this.triggerBoardStateUpdate(this.boardStateStack[this.boardStatePosition]);
+  }
 
   applyDiffs(diffs: BoardDiff[]): void {
-    const prevBoardState = this.boardStateStack[
-      this.boardStateStack.length - 1
-    ];
+    const prevBoardState = this.getBoardState();
     const newBoardState = prevBoardState.applyDiffs(diffs);
     if (newBoardState !== prevBoardState) {
+      // discard any redos in the stack
+      this.boardStateStack.splice(this.boardStatePosition + 1);
+      // and push this new state onto the undo stack
       this.boardStateStack.push(newBoardState);
+      this.boardStatePosition++;
       this.triggerBoardStateUpdate(newBoardState);
     }
+  }
+
+  getBoardState(): LocalBoardState {
+    return this.boardStateStack[this.boardStatePosition];
   }
 }
 
@@ -314,16 +459,24 @@ class RemoteGameState extends BaseGameState {
       this.triggerBoardStateUpdate(newClientBoardState);
     }
   }
+
+  getBoardState(): LocalBoardState {
+    return this.clientBoardState;
+  }
 }
 
 // @ts-ignore: stick this on window for testing
-window.RemoteGameState = RemoteGameState;
-// @ts-ignore
 window.getTestRemoteGameState = async () => {
   const gs = new RemoteGameState(
     new WebSocket("ws://127.0.0.1:9091/api/v1/realtime/")
   );
   await gs.connect();
+  gs.addBoardStateListener((bs) => console.log(bs.squares.toJS()));
+  return gs;
+};
+// @ts-ignore
+window.getTestLocalGameState = () => {
+  const gs = new LocalGameState(LocalBoardState.empty());
   gs.addBoardStateListener((bs) => console.log(bs.squares.toJS()));
   return gs;
 };

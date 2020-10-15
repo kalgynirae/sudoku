@@ -14,41 +14,44 @@ pub struct BoardSquare {
 
 impl BoardSquare {
     fn apply(&mut self, diff: &BoardDiffOperation) {
+        if self.locked {
+            return;
+        }
         match *diff {
             BoardDiffOperation::SetNumber { digit } => {
                 self.number = digit;
             }
             BoardDiffOperation::AddPencilMark {
-                r#type: BoardPencilType::Center,
+                r#type: BoardPencilType::Centers,
                 digit,
             } => {
                 self.centers.insert(digit);
             }
             BoardDiffOperation::AddPencilMark {
-                r#type: BoardPencilType::Corner,
+                r#type: BoardPencilType::Corners,
                 digit,
             } => {
                 self.corners.insert(digit);
             }
             BoardDiffOperation::RemovePencilMark {
-                r#type: BoardPencilType::Center,
+                r#type: BoardPencilType::Centers,
                 digit,
             } => {
                 self.centers.remove(digit);
             }
             BoardDiffOperation::RemovePencilMark {
-                r#type: BoardPencilType::Corner,
+                r#type: BoardPencilType::Corners,
                 digit,
             } => {
                 self.corners.remove(digit);
             }
             BoardDiffOperation::ClearPencilMarks {
-                r#type: BoardPencilType::Center,
+                r#type: BoardPencilType::Centers,
             } => {
                 self.centers = Default::default();
             }
             BoardDiffOperation::ClearPencilMarks {
-                r#type: BoardPencilType::Corner,
+                r#type: BoardPencilType::Corners,
             } => {
                 self.corners = Default::default();
             }
@@ -99,8 +102,8 @@ pub struct BoardDiff {
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum BoardPencilType {
-    Center,
-    Corner,
+    Centers,
+    Corners,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

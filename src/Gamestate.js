@@ -1,9 +1,10 @@
 import * as immutable from "immutable";
 
 import { affectedBy, box, col, row } from "./Geometry.js";
+
 // TOOD: this is dead code, we just want to load it into the page
-// eslint-disable-next-line no-unused-vars
-import { RealtimeGamestate } from "./Realtime.ts";
+import "./gameLogic/LocalGameState.ts";
+import "./gameLogic/RemoteGameState.ts";
 
 const Square = immutable.Record({
   number: null,

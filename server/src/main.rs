@@ -67,7 +67,6 @@ enum RequestMessage {
 struct GlobalState {
     // TODO: rooms are never cleaned up. We need to GC them and maybe move them to a database
     rooms: HashMap<RoomId, Arc<Mutex<RoomState>>>,
-    room_counter: RoomId,
 }
 
 async fn handle_request_message(
@@ -342,8 +341,7 @@ async fn main() {
                     }
                     None => {
                         let global_state = &mut *global_state.lock().await;
-                        let room_id = global_state.room_counter;
-                        global_state.room_counter += 1;
+                        let room_id = RoomId::random();
                         let room_state = Arc::new(Mutex::new(RoomState::new(room_id)));
                         global_state.rooms.insert(room_id, room_state.clone());
                         room_state

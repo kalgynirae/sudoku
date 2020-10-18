@@ -837,6 +837,8 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
+ "once_cell",
+ "rand",
  "serde",
  "serde_json",
  "tokio",

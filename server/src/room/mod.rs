@@ -1,9 +1,12 @@
+mod id;
+
 use log::error;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::board::{BoardDiff, BoardState};
 use crate::error::SudokuError;
+pub use crate::room::id::RoomId;
 
 // We have to send O(n^2) messages per n clients, so set a cap to keep things sane.
 const MAX_SESSIONS_PER_ROOM: usize = 32;
@@ -15,7 +18,6 @@ const MAX_BOARD_DIFF_GROUP_QUEUE: usize = 32;
 // operation.
 const MAX_BOARD_DIFF_GROUP_SIZE: usize = 8;
 
-pub type RoomId = u64;
 pub type BoardId = u64;
 pub type SessionId = u64;
 
@@ -52,13 +54,13 @@ pub struct RoomState {
 }
 
 impl RoomState {
-    pub fn new(room_id: u64) -> RoomState {
+    pub fn new(room_id: RoomId) -> RoomState {
         let (diff_tx, _diff_rx) = broadcast::channel(MAX_BOARD_DIFF_GROUP_QUEUE);
         RoomState {
-            room_id: room_id,
+            room_id,
             board_id: 0,
             board: Default::default(),
-            diff_tx: diff_tx,
+            diff_tx,
             session_counter: 0,
         }
     }
@@ -96,9 +98,9 @@ impl RoomState {
             self.board.apply(bd)?;
         }
         let broadcast = BoardDiffBroadcast {
-            board_diffs: board_diffs,
+            board_diffs,
             sender_id: session_id,
-            sync_id: sync_id,
+            sync_id,
         };
         if let Err(_) = self.diff_tx.send(Arc::new(broadcast)) {
             // we shouldn't be sending if there's no receivers, because the session doing the

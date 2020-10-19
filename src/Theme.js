@@ -1,6 +1,6 @@
 import chroma from "chroma-js";
 
-import { Modes } from "./Gamestate.js";
+import { Modes } from "./gameLogic/BaseGameState.ts";
 
 function makeTheme(base) {
   const theme = { base: base };

@@ -16,16 +16,10 @@ import { createGlobalStyle } from "styled-components";
 
 import { Board, BoardSizer } from "./Board";
 import { Button, ButtonRow, TopControls } from "./Buttons";
-import {
-  Action,
-  canRedo,
-  canUndo,
-  createBoard,
-  createGamestate,
-  getErrors,
-  Modes,
-  updateGamestate,
-} from "./Gamestate";
+import { Modes } from "./gameLogic/BaseGameState.ts";
+import BoardState from "./gameLogic/BoardState.ts";
+import LocalGameState from "./gameLogic/LocalGameState.ts";
+import useBoardStateFromGameState from "./gameLogic/useBoardStateFromGameState.ts";
 import { squareAt } from "./Geometry";
 import { copyBoardAsURL, decodeBoard, encodeBoard } from "./Loader";
 import { Selection, SelectionAction, updateSelection } from "./Selection";
@@ -35,14 +29,11 @@ import { ModeTheme, Themes } from "./Theme";
 const searchParams = new URLSearchParams(window.location.search);
 const initialBoard = searchParams.has("board")
   ? decodeBoard(searchParams.get("board"))
-  : createBoard(null);
+  : BoardState.empty();
 
 export default function App() {
-  const [gamestate, realDispatchGamestate] = useReducer(
-    updateGamestate,
-    null,
-    () => createGamestate(initialBoard)
-  );
+  const [gameState, _setGameState] = useState(new LocalGameState(initialBoard));
+  const currentBoard = useBoardStateFromGameState(gameState);
   const [mode, setMode] = useState(Modes.normal);
   const [selection, dispatchSelection] = useReducer(
     updateSelection,
@@ -53,24 +44,14 @@ export default function App() {
     INITIAL_SETTINGS
   );
 
-  const dispatchGamestate = useCallback(
-    (params) =>
-      realDispatchGamestate({
-        mode: mode,
-        selection: selection,
-        settings: settings,
-        ...params,
-      }),
-    [mode, selection, settings]
-  );
-
   //
   // STATE
   //
-  const currentBoard = gamestate.boards.get(gamestate.index);
   const currentErrors = useMemo(
     () =>
-      settings.get("showConflicts") ? getErrors(currentBoard) : immutable.Set(),
+      settings.get("showConflicts")
+        ? currentBoard.getErrors()
+        : immutable.Set(),
     [currentBoard, settings]
   );
 
@@ -89,15 +70,20 @@ export default function App() {
   //
   const inputDigit = useCallback(
     (digit) => {
-      dispatchGamestate({
-        action: Action.input,
-        digit: digit,
-        mode: mode,
-        settings: settings,
+      gameState.applyInput(selection, mode, digit, {
+        automaticallyRemoveMarks: settings.get("automaticallyRemoveMarks"),
       });
     },
-    [dispatchGamestate, mode, settings]
+    [gameState, selection, mode, settings]
   );
+
+  const handleUndoClick = useCallback(() => {
+    gameState.undo();
+  }, [gameState]);
+
+  const handleRedoClick = useCallback(() => {
+    gameState.redo();
+  }, [gameState]);
 
   //
   // TOUCH
@@ -191,13 +177,13 @@ export default function App() {
           inputDigit(null);
           break;
         case "x":
-          if (canRedo) {
-            dispatchGamestate({ action: Action.redo });
+          if (gameState.canRedo()) {
+            gameState.redo();
           }
           break;
         case "z":
-          if (canUndo) {
-            dispatchGamestate({ action: Action.undo });
+          if (gameState.canUndo()) {
+            gameState.undo();
           }
           break;
         default:
@@ -206,7 +192,7 @@ export default function App() {
       }
       e.preventDefault();
     },
-    [dispatchGamestate, inputDigit, moveCursor]
+    [gameState, inputDigit, moveCursor]
   );
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
@@ -238,11 +224,12 @@ export default function App() {
       <GlobalStyle />
       <BoardSizer>
         <TopControls
-          canRedo={canRedo(gamestate)}
-          canUndo={canUndo(gamestate)}
-          dispatchGamestate={dispatchGamestate}
-          selection={selection}
+          canRedo={gameState.canRedo()}
+          canUndo={gameState.canUndo()}
           dispatchSelection={dispatchSelection}
+          onRedoClick={handleRedoClick}
+          onUndoClick={handleUndoClick}
+          selection={selection}
         />
         <ThemeProvider theme={ModeTheme[mode]}>
           <Board

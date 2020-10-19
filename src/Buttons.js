@@ -4,7 +4,6 @@ import * as immutable from "immutable";
 import React from "react";
 import styled, { ThemeProvider } from "styled-components";
 
-import { Action } from "./Gamestate";
 import { SelectionAction } from "./Selection";
 import { Themes } from "./Theme";
 
@@ -152,20 +151,14 @@ const StyledUndoRedo = styled.div`
   width: 6em;
 `;
 
-export function UndoRedo({ dispatchGamestate, canUndo, canRedo }) {
+export function UndoRedo({ canRedo, canUndo, onRedoClick, onUndoClick }) {
   return (
     <StyledUndoRedo>
       <ButtonRow>
-        <Button
-          onClick={() => dispatchGamestate({ action: Action.undo })}
-          enabled={canUndo}
-        >
+        <Button onClick={onUndoClick} enabled={canUndo}>
           <FontAwesomeIcon icon={faUndo} size="sm" />
         </Button>
-        <Button
-          onClick={() => dispatchGamestate({ action: Action.redo })}
-          enabled={canRedo}
-        >
+        <Button onClick={onRedoClick} enabled={canRedo}>
           <FontAwesomeIcon icon={faRedo} size="sm" />
         </Button>
       </ButtonRow>
@@ -183,9 +176,10 @@ const StyledTopControls = styled.div`
 export function TopControls({
   canRedo,
   canUndo,
-  dispatchGamestate,
-  selection,
   dispatchSelection,
+  onRedoClick,
+  onUndoClick,
+  selection,
 }) {
   return (
     <StyledTopControls>
@@ -197,9 +191,10 @@ export function TopControls({
       </ThemeProvider>
       <ThemeProvider theme={Themes.red}>
         <UndoRedo
-          dispatchGamestate={dispatchGamestate}
-          canUndo={canUndo}
           canRedo={canRedo}
+          canUndo={canUndo}
+          onRedoClick={onRedoClick}
+          onUndoClick={onUndoClick}
         />
       </ThemeProvider>
     </StyledTopControls>

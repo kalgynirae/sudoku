@@ -4,7 +4,7 @@ import * as immutable from "immutable";
 import React from "react";
 import styled from "styled-components";
 
-import { squareIncludesDigit } from "./Gamestate";
+import { squareIncludesDigit } from "./gameLogic/BoardState.ts";
 import { affectedBy, indexbox } from "./Geometry";
 
 export function Board({
@@ -25,7 +25,7 @@ export function Board({
     const squares = [];
     for (let isquare = 0; isquare < 9; isquare++) {
       const i = indexbox(ibox, isquare);
-      const square = board.get(i);
+      const square = board.squares.get(i);
       squares.push(
         <Square
           index={i}

@@ -1,5 +1,5 @@
-import { applyDiffsToLocalBoardState, BoardDiff } from "./BoardDiffs";
 import BaseGameState from "./BaseGameState";
+import { applyDiffsToLocalBoardState, BoardDiff } from "./BoardDiffs";
 import BoardState from "./BoardState";
 
 export default class LocalGameState extends BaseGameState {
@@ -16,7 +16,7 @@ export default class LocalGameState extends BaseGameState {
   }
 
   canRedo(): boolean {
-    return this.boardStatePosition < this.boardStateStack.length;
+    return this.boardStatePosition < this.boardStateStack.length - 1;
   }
 
   undo() {

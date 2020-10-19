@@ -1,6 +1,6 @@
-import LocalBoardState from "./BoardState";
-import { applyDiffsToLocalBoardState, BoardDiff } from "./BoardDiffs";
 import BaseGameState from "./BaseGameState";
+import { applyDiffsToLocalBoardState, BoardDiff } from "./BoardDiffs";
+import LocalBoardState from "./BoardState";
 
 type ServerBoardSquare = {
   number: number | null;

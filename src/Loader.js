@@ -1,17 +1,17 @@
 import * as immutable from "immutable";
 
-import { createBoard } from "./Gamestate.js";
+import BoardState from "./gameLogic/BoardState.ts";
 
 export function decodeBoard(encoded) {
   const numbers = immutable.List(encoded).map((char) => {
     const parsed = parseInt(char);
     return parsed > 0 && parsed < 10 ? parsed : null;
   });
-  return createBoard(numbers);
+  return BoardState.withNumbers(numbers);
 }
 
 export function encodeBoard(board) {
-  return board.map((square) => square.get("number") ?? ".").join("");
+  return board.squares.map((square) => square.get("number") ?? ".").join("");
 }
 
 export function copyBoardAsURL(board) {

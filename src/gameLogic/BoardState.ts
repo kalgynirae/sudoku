@@ -1,5 +1,7 @@
 import * as Immutable from "immutable";
 
+import { box, col, row } from "../Geometry.js";
+
 export type BoardSquareProps = {
   number: number | null;
   corners: Immutable.Set<number>;
@@ -20,6 +22,21 @@ export const createBoardSquare: Immutable.Record.Factory<BoardSquareProps> = Imm
 
 export type BoardSquare = Immutable.Record<BoardSquareProps>;
 
+function nullthrows<T>(value: T | null | undefined): T {
+  if (value == null) {
+    throw new Error("unexpected null value");
+  }
+  return value;
+}
+
+export function squareIncludesDigit(square: BoardSquare, digit: number) {
+  return digit === null
+    ? false
+    : square.get("number") === digit ||
+        square.get("corners").includes(digit) ||
+        square.get("centers").includes(digit);
+}
+
 export default class BoardState {
   constructor(public readonly squares: Immutable.List<BoardSquare>) {}
 
@@ -38,5 +55,25 @@ export default class BoardState {
         )
         .toList()
     );
+  }
+
+  getErrors() {
+    const rows = Immutable.Range(0, 9).map((r) => row(r));
+    const columns = Immutable.Range(0, 9).map((c) => col(c));
+    const boxes = Immutable.Range(0, 9).map((b) => box(b));
+    const sections = rows.concat(columns, boxes);
+    const errorSquares = Immutable.Set().asMutable();
+    sections.forEach((section) => {
+      const squareNumbers = Immutable.Map(
+        section.map((s) => [s, nullthrows(this.squares.get(s)).get("number")])
+      ).filter((v) => v !== null);
+      const numberCounts = squareNumbers.countBy((number) => number);
+      squareNumbers.forEach((number, s) => {
+        if (nullthrows(numberCounts.get(number)) > 1) {
+          errorSquares.add(s);
+        }
+      });
+    });
+    return errorSquares.asImmutable();
   }
 }

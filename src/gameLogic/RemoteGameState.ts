@@ -1,6 +1,10 @@
+import * as Immutable from "immutable";
+
 import BaseGameState from "./BaseGameState";
 import { applyDiffsToLocalBoardState, BoardDiff } from "./BoardDiffs";
-import LocalBoardState from "./BoardState";
+import LocalBoardState, {
+  createBoardSquare as createLocalBoardSquare,
+} from "./BoardState";
 
 type ServerBoardSquare = {
   number: number | null;
@@ -26,7 +30,7 @@ type RequestMessage = SetBoardStateRequestMessage | ApplyDiffsRequestMessage;
 
 type InitResponseMessage = {
   type: "init";
-  boardId: string;
+  roomId: string;
   boardState: ServerBoardState;
 };
 type PartialUpdateResponseMessage = {
@@ -34,9 +38,56 @@ type PartialUpdateResponseMessage = {
   syncId: number;
   diffs: BoardDiff[];
 };
-type ResponseMessage = InitResponseMessage | PartialUpdateResponseMessage;
+type FullUpdateResponseMessage = {
+  type: "fullUpdate";
+  syncId: number;
+  boardState: ServerBoardState;
+};
+type ResponseMessage =
+  | InitResponseMessage
+  | PartialUpdateResponseMessage
+  | FullUpdateResponseMessage;
+
+function toLocalBoardState(serverBs: ServerBoardState): LocalBoardState {
+  return new LocalBoardState(
+    Immutable.Seq(serverBs.squares)
+      .map((sq) =>
+        createLocalBoardSquare({
+          number: sq.number,
+          corners: Immutable.Set(sq.corners),
+          centers: Immutable.Set(sq.centers),
+          locked: sq.locked,
+        })
+      )
+      .toList()
+  );
+}
+
+function toServerBoardState(localBs: LocalBoardState): ServerBoardState {
+  return { squares: localBs.squares.toJS() };
+}
+
+const REALTIME_API_URI = "wss://sudoku-server.benjam.info/api/v1/realtime/";
+// we want to be able to force localhost for testing
+const LOCALHOST_REALTIME_API_URI = "ws://127.0.0.1:9091/api/v1/realtime/";
+const FORCE_LOCALHOST = new URLSearchParams(window.location.search).has(
+  "localhost"
+);
+
+function getUri(roomId?: string | null): string {
+  const base = FORCE_LOCALHOST ? LOCALHOST_REALTIME_API_URI : REALTIME_API_URI;
+  return roomId == null ? base : base + roomId;
+}
+
+function nullthrows<T>(value: T | null | undefined): T {
+  if (value == null) {
+    throw new Error("unexpected null value");
+  }
+  return value;
+}
 
 export default class RemoteGameState extends BaseGameState {
+  private ws: WebSocket | null = null;
   // what the server has confirmed
   private serverBoardState: LocalBoardState | null = null;
   // what the UI should currently show
@@ -48,36 +99,59 @@ export default class RemoteGameState extends BaseGameState {
   // unconfirmedDiffGroups queue
   private lastSentSyncId: number = 0;
   private lastReceivedSyncId: number = 0;
+  roomId: string | null = null;
 
-  constructor(private ws: WebSocket) {
-    super();
-  }
-
-  connect(): Promise<void> {
-    this.ws.onmessage = this.onMessage;
+  connect(
+    roomId?: string | null,
+    initialBoard?: LocalBoardState | null
+  ): Promise<void> {
+    const ws = new WebSocket(getUri(roomId));
+    this.ws = ws;
     return new Promise((resolve, reject) => {
-      this.ws.onopen = () => resolve();
-      this.ws.onerror = (err) => reject(err);
+      ws.onmessage = (rawMsg: MessageEvent) => {
+        const msg: ResponseMessage = JSON.parse(rawMsg.data);
+        this.onResponseMessage(msg);
+        if (msg.type === "init") {
+          // TODO: This is hacky. We should revise the protocol to allow the
+          // client to send an init message before the server sends its init
+          // message.
+          if (initialBoard) {
+            this.sendRequestMessage({
+              type: "setBoardState",
+              boardState: toServerBoardState(initialBoard),
+            });
+            this.serverBoardState = initialBoard;
+            this.clientBoardState = initialBoard;
+            this.triggerBoardStateUpdate(initialBoard);
+          }
+          // only resolve after we get an init
+          resolve();
+        }
+      };
+      // TODO: add error handling for errors that happen after socket setup
+      ws.onerror = (err) => reject(err);
     });
   }
 
   close(): void {
-    this.ws.close();
+    this.ws?.close();
   }
 
-  private onMessage = (rawMessage: MessageEvent) => {
-    this.onResponseMessage(JSON.parse(rawMessage.data));
-  };
-
   private sendRequestMessage(msg: RequestMessage) {
-    this.ws.send(JSON.stringify(msg));
+    // TODO: this could actually be null, handle this a bit better
+    nullthrows(this.ws).send(JSON.stringify(msg));
   }
 
   private onResponseMessage(msg: ResponseMessage): void {
     switch (msg.type) {
       case "init":
-        // TODO: implement me
-        this.serverBoardState = LocalBoardState.empty();
+        this.serverBoardState = toLocalBoardState(msg.boardState);
+        this.clientBoardState = this.serverBoardState;
+        this.unconfirmedDiffGroups = [];
+        this.lastSentSyncId = 0;
+        this.lastReceivedSyncId = 0;
+        this.roomId = msg.roomId;
+        this.triggerBoardStateUpdate(this.clientBoardState);
         break;
       case "partialUpdate":
         if (this.serverBoardState == null) {
@@ -87,35 +161,38 @@ export default class RemoteGameState extends BaseGameState {
           this.serverBoardState,
           msg.diffs
         );
-
-        // use syncId to update unconfirmedDiffGroups
-        if (msg.syncId > this.lastReceivedSyncId) {
-          this.unconfirmedDiffGroups.splice(
-            0,
-            msg.syncId - this.lastReceivedSyncId
-          );
-        }
-        this.lastReceivedSyncId = msg.syncId;
-
-        // apply unconfirmedDiffGroups to serverBoardState to get the new
-        // clientBoardState
-        const newClientBoardState = this.unconfirmedDiffGroups.reduce(
-          (st, dfGrp) => applyDiffsToLocalBoardState(st, dfGrp),
-          this.serverBoardState
-        );
-        // this will often differ by identity, but we should only trigger an
-        // update when it differs by equality
-        if (
-          !newClientBoardState.squares.equals(this.clientBoardState.squares)
-        ) {
-          this.clientBoardState = newClientBoardState;
-          this.triggerBoardStateUpdate(newClientBoardState);
-        }
+        this.updateClientBoardState(msg.syncId);
+        break;
+      case "fullUpdate":
+        this.serverBoardState = toLocalBoardState(msg.boardState);
+        this.clientBoardState = this.serverBoardState;
+        this.updateClientBoardState(msg.syncId);
         break;
       default:
         throw new Error(
           `Received unsupported response message type from server: ${msg}`
         );
+    }
+  }
+
+  private updateClientBoardState(syncId: number): void {
+    // use syncId to update unconfirmedDiffGroups
+    if (syncId > this.lastReceivedSyncId) {
+      this.unconfirmedDiffGroups.splice(0, syncId - this.lastReceivedSyncId);
+    }
+    this.lastReceivedSyncId = syncId;
+
+    // apply unconfirmedDiffGroups to serverBoardState to get the new
+    // clientBoardState
+    const newClientBoardState = this.unconfirmedDiffGroups.reduce(
+      (st, dfGrp) => applyDiffsToLocalBoardState(st, dfGrp),
+      nullthrows(this.serverBoardState)
+    );
+    // this will often differ by identity, but we should only trigger an
+    // update when it differs by equality
+    if (!newClientBoardState.squares.equals(this.clientBoardState.squares)) {
+      this.clientBoardState = newClientBoardState;
+      this.triggerBoardStateUpdate(newClientBoardState);
     }
   }
 
@@ -140,13 +217,3 @@ export default class RemoteGameState extends BaseGameState {
     return this.clientBoardState;
   }
 }
-
-// @ts-ignore: stick this on window for testing
-window.getTestRemoteGameState = async () => {
-  const gs = new RemoteGameState(
-    new WebSocket("ws://127.0.0.1:9091/api/v1/realtime/")
-  );
-  await gs.connect();
-  gs.addBoardStateListener((bs) => console.log(bs.squares.toJS()));
-  return gs;
-};

@@ -69,6 +69,12 @@ export default abstract class BaseGameState {
   abstract getBoardState(): BoardState;
 
   /**
+   * Called right before we dispose of a gamestate, allowing the gamestate to
+   * clean up external resources (e.g. websockets).
+   */
+  close(): void {}
+
+  /**
    * Applies the user's input to the board by combining the input with the
    * current board state.
    *

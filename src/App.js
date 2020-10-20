@@ -19,20 +19,34 @@ import { Button, ButtonRow, TopControls } from "./Buttons";
 import { Modes } from "./gameLogic/BaseGameState.ts";
 import BoardState from "./gameLogic/BoardState.ts";
 import LocalGameState from "./gameLogic/LocalGameState.ts";
+import RemoteGameState from "./gameLogic/RemoteGameState.ts";
 import useBoardStateFromGameState from "./gameLogic/useBoardStateFromGameState.ts";
 import { squareAt } from "./Geometry";
 import { copyBoardAsURL, decodeBoard, encodeBoard } from "./Loader";
 import { Selection, SelectionAction, updateSelection } from "./Selection";
-import { INITIAL_SETTINGS, Settings, updateSettings } from "./Settings";
+import GameplaySettings, {
+  INITIAL_SETTINGS,
+  updateSettings,
+} from "./settings/GameplaySettings";
+import SocialSettings from "./settings/SocialSettings";
 import { ModeTheme, Themes } from "./Theme";
 
 const searchParams = new URLSearchParams(window.location.search);
 const initialBoard = searchParams.has("board")
   ? decodeBoard(searchParams.get("board"))
   : BoardState.empty();
+const initialRoomId = searchParams.get("room");
 
 export default function App() {
-  const [gameState, _setGameState] = useState(new LocalGameState(initialBoard));
+  const [gameState, setGameState] = useState(() => {
+    if (initialRoomId) {
+      const gs = new RemoteGameState();
+      gs.connect(initialRoomId);
+      return gs;
+    } else {
+      return new LocalGameState(initialBoard);
+    }
+  });
   const currentBoard = useBoardStateFromGameState(gameState);
   const [mode, setMode] = useState(Modes.normal);
   const [selection, dispatchSelection] = useReducer(
@@ -289,7 +303,11 @@ export default function App() {
           </ButtonRow>
         </ThemeProvider>
       </div>
-      <Settings settings={settings} dispatchSettings={dispatchSettings} />
+      <GameplaySettings
+        settings={settings}
+        dispatchSettings={dispatchSettings}
+      />
+      <SocialSettings gameState={gameState} onSetGameState={setGameState} />
       <p>
         Current board: <tt>{encodeBoard(currentBoard)}</tt>
       </p>

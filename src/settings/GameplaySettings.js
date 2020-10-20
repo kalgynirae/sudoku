@@ -1,6 +1,12 @@
 import * as immutable from "immutable";
-import React from "react";
-import styled from "styled-components";
+import React, { useCallback } from "react";
+
+import {
+  SettingsFlex,
+  SettingsGroup,
+  SettingsToggle as UnconnectedSettingsToggle,
+  SettingsUl,
+} from "./Common.tsx";
 
 export const INITIAL_SETTINGS = immutable.Map({
   automaticallyRemoveMarks: false,
@@ -23,94 +29,74 @@ export function updateSettings(settings, { action, name }) {
   }
 }
 
-export function Settings({ settings, dispatchSettings }) {
+export default function GameplaySettings({ settings, dispatchSettings }) {
   return (
     <SettingsFlex>
       <SettingsGroup>
         <legend>Display</legend>
         <SettingsUl>
-          <Toggle
+          <ConnectedSettingsToggle
             name="showConflicts"
             settings={settings}
             dispatch={dispatchSettings}
           >
             Show conflicts
-          </Toggle>
-          <Toggle
+          </ConnectedSettingsToggle>
+          <ConnectedSettingsToggle
             name="showLocked"
             settings={settings}
             dispatch={dispatchSettings}
           >
             Show locked squares
-          </Toggle>
+          </ConnectedSettingsToggle>
         </SettingsUl>
       </SettingsGroup>
       <SettingsGroup>
         <legend>Pencil Marks</legend>
         <SettingsUl>
-          <Toggle
+          <ConnectedSettingsToggle
             name="automaticallyRemoveMarks"
             settings={settings}
             dispatch={dispatchSettings}
           >
             Automatically remove marks
-          </Toggle>
-          <Toggle
+          </ConnectedSettingsToggle>
+          <ConnectedSettingsToggle
             name="highlightAffectedMarks"
             settings={settings}
             dispatch={dispatchSettings}
           >
             Highlight affected marks (doesn't work yet)
-          </Toggle>
+          </ConnectedSettingsToggle>
         </SettingsUl>
       </SettingsGroup>
       <SettingsGroup>
         <legend>Selection</legend>
         <SettingsUl>
-          <Toggle
+          <ConnectedSettingsToggle
             name="highlightPeers"
             settings={settings}
             dispatch={dispatchSettings}
           >
             Highlight peers
-          </Toggle>
+          </ConnectedSettingsToggle>
         </SettingsUl>
       </SettingsGroup>
     </SettingsFlex>
   );
 }
 
-const SettingsFlex = styled.div`
-  display: flex;
-`;
-
-const SettingsGroup = styled.fieldset`
-  border: 1px solid ${(p) => p.theme.border};
-  padding: 0 0.75rem;
-`;
-
-const SettingsUl = styled.ul`
-  line-height: 1.5;
-  list-style: none;
-  padding: 0;
-`;
-
-function Toggle({ children, name, settings, dispatch }) {
+function ConnectedSettingsToggle({ children, name, settings, dispatch }) {
+  const handleChange = useCallback(() => {
+    dispatch({ action: SettingAction.toggle, name: name });
+  }, [dispatch, name]);
   return (
-    <SettingsListItem>
-      <input
-        type="checkbox"
-        id={`setting-${name}`}
-        checked={settings.get(name)}
-        onChange={() => dispatch({ action: SettingAction.toggle, name: name })}
-      />
-      <label for={`setting-${name}`}>{children}</label>
-    </SettingsListItem>
+    <UnconnectedSettingsToggle
+      name={name}
+      checked={settings.get(name)}
+      onChange={handleChange}
+    >
+      {children}
+    </UnconnectedSettingsToggle>
   );
 }
-
-const SettingsListItem = styled.li`
-  & > label {
-    padding-left: 0.5em;
-  }
-`;

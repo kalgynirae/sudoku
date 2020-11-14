@@ -5,11 +5,15 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::board::{BoardDiff, BoardState};
+use crate::cursors::{Cursors, SessionCursor};
 use crate::error::SudokuError;
 pub use crate::room::id::RoomId;
 
-// We have to send O(n^2) messages per n clients, so set a cap to keep things sane.
-const MAX_SESSIONS_PER_ROOM: usize = 32;
+// Limit the number of sessions per room because:
+// - We have to send O(n^2) messages per n clients
+// - We need to assign a unique color to each cursor, and there's only so many unique-looking
+//   colors.
+pub const MAX_SESSIONS_PER_ROOM: usize = 8;
 // If we exhaust this queue size and the websocket buffer, the client has lagged, and we should
 // send them a FullUpdate next time.
 const MAX_BOARD_DIFF_GROUP_QUEUE: usize = 32;
@@ -31,6 +35,7 @@ pub type ClientSyncId = u64;
 pub struct Session {
     pub session_id: SessionId,
     pub diff_rx: broadcast::Receiver<Arc<BoardDiffBroadcast>>,
+    pub cursor: SessionCursor,
 }
 
 pub struct BoardDiffBroadcast {
@@ -47,10 +52,11 @@ pub struct RoomState {
     pub board_id: BoardId,
     pub board: BoardState,
     // DO NOT send to this without grabbing the mutex first, otherwise the board state could fall
-    // behind. This should be a private member and only used via RoomState::apply.
+    // behind. This is a private member and only used via RoomState::apply.
     diff_tx: broadcast::Sender<Arc<BoardDiffBroadcast>>,
     /// Used to create unique session_ids for each Session
     session_counter: SessionId,
+    cursors: Cursors,
 }
 
 impl RoomState {
@@ -62,17 +68,19 @@ impl RoomState {
             board: Default::default(),
             diff_tx,
             session_counter: 0,
+            cursors: Cursors::new(),
         }
     }
 
     pub fn new_session(&mut self) -> Result<Session, SudokuError> {
-        if self.diff_tx.receiver_count() >= MAX_SESSIONS_PER_ROOM {
-            return Err(SudokuError::RoomFull(MAX_SESSIONS_PER_ROOM));
-        }
         self.session_counter += 1;
         Ok(Session {
             session_id: self.session_counter,
             diff_rx: self.diff_tx.subscribe(),
+            cursor: self
+                .cursors
+                .new_session(self.session_counter)
+                .or(Err(SudokuError::RoomFull(MAX_SESSIONS_PER_ROOM)))?,
         })
     }
 

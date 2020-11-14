@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum SudokuError {
     InvalidSquareIndex(usize),
     ReceivedBinaryMessage,
@@ -53,3 +54,5 @@ impl Serialize for SudokuError {
         serializer.serialize_str(&self.to_string())
     }
 }
+
+impl Error for SudokuError {}

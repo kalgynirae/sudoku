@@ -43,10 +43,15 @@ type FullUpdateResponseMessage = {
   syncId: number;
   boardState: ServerBoardState;
 };
+type UpdateCursorResponseMessage = {
+  type: "updateCursor";
+  map: {[colorIdx: string]: number[]};
+};
 type ResponseMessage =
   | InitResponseMessage
   | PartialUpdateResponseMessage
-  | FullUpdateResponseMessage;
+  | FullUpdateResponseMessage
+  | UpdateCursorResponseMessage;
 
 function toLocalBoardState(serverBs: ServerBoardState): LocalBoardState {
   return new LocalBoardState(
@@ -105,6 +110,7 @@ export default class RemoteGameState extends BaseGameState {
     roomId?: string | null,
     initialBoard?: LocalBoardState | null
   ): Promise<void> {
+    console.log("connect");
     const ws = new WebSocket(getUri(roomId));
     this.ws = ws;
     return new Promise((resolve, reject) => {
@@ -168,9 +174,12 @@ export default class RemoteGameState extends BaseGameState {
         this.clientBoardState = this.serverBoardState;
         this.updateClientBoardState(msg.syncId);
         break;
+      case "updateCursor":
+        console.log("updateCursor", msg);
+        break;
       default:
         throw new Error(
-          `Received unsupported response message type from server: ${msg}`
+          `Received unsupported response message type from server: ${JSON.stringify(msg)}`
         );
     }
   }

@@ -134,8 +134,14 @@ mod tests {
 
         let mut session1 = cursors.new_session(1001).unwrap();
 
-        session0.tx.update(serde_json::from_value(json!([1, 2, 3])).unwrap()).unwrap();
-        session1.tx.update(serde_json::from_value(json!([4, 5, 6])).unwrap()).unwrap();
+        session0
+            .tx
+            .update(serde_json::from_value(json!([1, 2, 3])).unwrap())
+            .unwrap();
+        session1
+            .tx
+            .update(serde_json::from_value(json!([4, 5, 6])).unwrap())
+            .unwrap();
         assert_eq!(
             serde_json::to_value(session0.rx.recv().await.unwrap()).unwrap(),
             json!({"1": [4, 5, 6]})

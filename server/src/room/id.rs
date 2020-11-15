@@ -122,7 +122,10 @@ mod tests {
 
     #[test]
     fn max_int() {
-        assert_eq!(RoomId(u128::MAX).to_string().parse::<RoomId>().unwrap().0, u128::MAX);
+        assert_eq!(
+            RoomId(u128::MAX).to_string().parse::<RoomId>().unwrap().0,
+            u128::MAX
+        );
     }
 
     #[test]
@@ -132,7 +135,9 @@ mod tests {
         // but too many 'z' characters eventually causes an overflow
         assert_eq!(
             "rzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz".parse::<RoomId>(),
-            Err(InvalidRoomIdError("rzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz".to_owned()))
+            Err(InvalidRoomIdError(
+                "rzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz".to_owned()
+            ))
         );
     }
 }

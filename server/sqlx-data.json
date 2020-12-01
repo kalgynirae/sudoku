@@ -1,0 +1,31 @@
+{
+  "db": "SQLite",
+  "ab5807caecd0915254a55f362fa167c9775b21a605ff52fd56f2bf3468f22a79": {
+    "query": "select board from rooms where id = ?",
+    "describe": {
+      "columns": [
+        {
+          "name": "board",
+          "ordinal": 0,
+          "type_info": "Blob"
+        }
+      ],
+      "parameters": {
+        "Right": 1
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "d03e24579e7bbec178490ffa26b067c293fd626a414579afeae9468fb1803fd0": {
+    "query": "insert or replace into rooms (id, board) values (?, ?)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Right": 2
+      },
+      "nullable": []
+    }
+  }
+}

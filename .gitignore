@@ -24,3 +24,4 @@ yarn-error.log*
 
 # server
 server/target
+server/*.db

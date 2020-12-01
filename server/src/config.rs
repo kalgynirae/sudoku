@@ -24,6 +24,8 @@ pub struct Config {
     pub listen_addr: SocketAddr,
     #[serde(default)]
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub database: DatabaseConfig,
 }
 
 impl Config {
@@ -58,8 +60,24 @@ impl Default for LoggingConfig {
     }
 }
 
+#[derive(Deserialize)]
+pub struct DatabaseConfig {
+    #[serde(default = "default_database_uri")]
+    pub uri: String,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        toml::from_str("").unwrap()
+    }
+}
+
 fn default_listen_addr() -> SocketAddr {
     "127.0.0.1:9091".parse().unwrap()
+}
+
+fn default_database_uri() -> String {
+    "sqlite::memory:".to_owned()
 }
 
 impl LoggingConfig {

@@ -51,6 +51,9 @@ pub struct RoomState {
     #[allow(dead_code)]
     pub board_id: BoardId,
     pub board: BoardState,
+    /// Indicates that the RoomState has changed in a way that causes it to differ from the room
+    /// on disk. This is cleared whenever we write back to disk.
+    pub dirty: bool,
     // DO NOT send to this without grabbing the mutex first, otherwise the board state could fall
     // behind. This is a private member and only used via RoomState::apply.
     diff_tx: broadcast::Sender<Arc<BoardDiffBroadcast>>,
@@ -66,6 +69,7 @@ impl RoomState {
             room_id,
             board_id: 0,
             board: Default::default(),
+            dirty: true,
             diff_tx,
             session_counter: 0,
             cursors: Cursors::new(),
@@ -105,6 +109,7 @@ impl RoomState {
         for bd in board_diffs.iter() {
             self.board.apply(bd)?;
         }
+        self.dirty = true;
         let broadcast = BoardDiffBroadcast {
             board_diffs,
             sender_id: session_id,
@@ -116,5 +121,20 @@ impl RoomState {
             error!("tried to send message to broadcast with no receivers")
         }
         Ok(())
+    }
+
+    #[cfg(feature = "sql")]
+    pub fn sql_serialize(&self) -> [u8; 81 * 6] {
+        self.board.sql_serialize()
+    }
+
+    #[cfg(feature = "sql")]
+    pub fn sql_deserialize(
+        room_id: RoomId,
+        board_bytes: &[u8; 81 * 6],
+    ) -> Result<Self, &'static str> {
+        let mut room = Self::new(room_id);
+        room.board = BoardState::sql_deserialize(board_bytes)?;
+        Ok(room)
     }
 }

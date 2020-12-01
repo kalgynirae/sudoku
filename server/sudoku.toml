@@ -3,3 +3,12 @@ listen_addr = "127.0.0.1:9091"
 [logging]
 color = true
 level = "info"
+
+[database]
+# This database is for persistence. Data is stored in memory and then
+# periodically flushed back to disk via the memory. The path is resolved
+# relative to the cwd when the server starts.
+#
+# This is opened with `?mode=rwc`, which will cause the dev database to be
+# created if it doesn't already exist.
+uri = "sqlite://dev.db?mode=rwc"

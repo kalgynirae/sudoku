@@ -66,6 +66,12 @@ impl FromStr for RoomId {
     }
 }
 
+impl From<RoomId> for u128 {
+    fn from(val: RoomId) -> u128 {
+        val.0
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct InvalidRoomIdError(String);
 

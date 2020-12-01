@@ -7,6 +7,7 @@ use log::{debug, error, warn};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use warp::filters::BoxedFilter;
+use warp::reject::Reject;
 use warp::ws::{Message, WebSocket};
 use warp::{Filter, Reply};
 
@@ -18,8 +19,17 @@ use crate::realtime::protocol::{
 use crate::realtime::tasks::error::ApiTaskError;
 use crate::realtime::tasks::{CursorNotifyReceiver, DiffBroadcastReceiver, RequestReceiver};
 use crate::room::{ClientSyncId, RoomId, RoomState, Session};
+use crate::sql;
 
-pub fn get_filter(global_state: Arc<Mutex<GlobalState>>) -> BoxedFilter<(impl Reply,)> {
+#[derive(Debug)]
+struct InternalErrorReject;
+
+impl Reject for InternalErrorReject {}
+
+pub fn get_filter(
+    global_state: Arc<GlobalState>,
+    db_pool: Arc<sql::Pool>,
+) -> BoxedFilter<(impl Reply,)> {
     warp::path!("api" / "v1" / "realtime" / ..)
         .and(
             // TODO: room ids should be unguessable keys
@@ -29,22 +39,19 @@ pub fn get_filter(global_state: Arc<Mutex<GlobalState>>) -> BoxedFilter<(impl Re
                 .unify(),
         )
         .and(warp::any().map(move || global_state.clone()))
+        .and(warp::any().map(move || db_pool.clone()))
         .and_then(
-            |room_id, global_state: Arc<Mutex<GlobalState>>| async move {
+            |room_id, global_state: Arc<GlobalState>, db_pool: Arc<_>| async move {
                 Result::<Arc<Mutex<RoomState>>, warp::reject::Rejection>::Ok(match room_id {
-                    Some(room_id) => {
-                        let global_state = &mut *global_state.lock().await;
-                        global_state
-                            .rooms
-                            .get(&room_id)
-                            .ok_or(warp::reject::not_found())?
-                            .clone()
-                    }
+                    Some(room_id) => global_state
+                        .get_room(&db_pool, &room_id)
+                        .await
+                        .map_err(|_| warp::reject::custom(InternalErrorReject))?
+                        .ok_or_else(warp::reject::not_found)?,
                     None => {
-                        let global_state = &mut *global_state.lock().await;
                         let room_id = RoomId::random();
                         let room_state = Arc::new(Mutex::new(RoomState::new(room_id)));
-                        global_state.rooms.insert(room_id, room_state.clone());
+                        global_state.insert_room(room_id, room_state.clone()).await;
                         room_state
                     }
                 })

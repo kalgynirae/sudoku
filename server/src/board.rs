@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::digit::{Digit, DigitBitFlags};
 use crate::error::SudokuError;
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BoardSquare {
     pub number: Option<Digit>,
@@ -57,12 +57,42 @@ impl BoardSquare {
             }
         }
     }
+
+    #[cfg(feature = "sql")]
+    pub fn sql_serialize(&self) -> [u8; 6] {
+        let number = self.number.map(|v| v.into()).unwrap_or(0);
+        let corners = self.corners.sql_serialize();
+        let centers = self.centers.sql_serialize();
+        let locked = self.locked.into();
+        [
+            number, corners[0], corners[1], centers[0], centers[1], locked,
+        ]
+    }
+
+    #[cfg(feature = "sql")]
+    pub fn sql_deserialize(bytes: &[u8; 6]) -> Result<Self, &'static str> {
+        use std::convert::TryFrom;
+
+        Ok(BoardSquare {
+            number: match bytes[0] {
+                0 => None,
+                num => Some(Digit::try_from(num)?),
+            },
+            corners: DigitBitFlags::sql_deserialize([bytes[1], bytes[2]]),
+            centers: DigitBitFlags::sql_deserialize([bytes[3], bytes[4]]),
+            locked: match bytes[5] {
+                0 => false,
+                1 => true,
+                _ => return Err("locked must be 0 or 1"),
+            },
+        })
+    }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BoardState {
-    pub squares: Vec<BoardSquare>,
+    squares: Vec<BoardSquare>,
 }
 
 impl BoardState {
@@ -81,6 +111,37 @@ impl BoardState {
                 .apply(&diff.operation);
         }
         Ok(())
+    }
+
+    #[cfg(feature = "sql")]
+    pub fn sql_serialize(&self) -> [u8; 81 * 6] {
+        use std::convert::TryInto;
+
+        let mut result = Vec::with_capacity(81 * 6);
+        for sq in self.squares.iter() {
+            result.extend_from_slice(&sq.sql_serialize());
+        }
+        // use expect() assuming `self.squares` can't be malformed since it's an internal
+        // datastructure
+        result
+            .try_into()
+            .expect("return value of sql_serialize must match the size of the serialized squares")
+    }
+
+    #[cfg(feature = "sql")]
+    pub fn sql_deserialize(bytes: &[u8; 81 * 6]) -> Result<Self, &'static str> {
+        use std::convert::TryInto;
+
+        let squares: Vec<BoardSquare> = bytes
+            .chunks_exact(6)
+            .map(|b| {
+                BoardSquare::sql_deserialize(b.try_into().or(Err("all squares should be 6 bytes"))?)
+            })
+            .collect::<Result<_, _>>()?;
+        if squares.len() != 81 {
+            return Err("expected 81 squares when deserializing sql");
+        }
+        Ok(BoardState { squares })
     }
 }
 
@@ -123,4 +184,42 @@ pub enum BoardDiffOperation {
     },
     #[serde(rename_all = "camelCase")]
     ClearPencilMarks { r#type: BoardPencilType },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "sql")]
+    fn board_state_sql_serialize_deserialize() {
+        let mut bs = BoardState::default();
+        bs.apply(&BoardDiff {
+            squares: vec![0, 1, 2, 3],
+            operation: BoardDiffOperation::SetNumber {
+                digit: Some(Digit::D5),
+            },
+        })
+        .unwrap();
+        bs.apply(&BoardDiff {
+            squares: vec![4, 5, 6, 7],
+            operation: BoardDiffOperation::AddPencilMark {
+                r#type: BoardPencilType::Centers,
+                digit: Digit::D1,
+            },
+        })
+        .unwrap();
+        bs.apply(&BoardDiff {
+            squares: vec![8, 9],
+            operation: BoardDiffOperation::AddPencilMark {
+                r#type: BoardPencilType::Corners,
+                digit: Digit::D2,
+            },
+        })
+        .unwrap();
+        assert_eq!(
+            BoardState::sql_deserialize(&bs.sql_serialize()).unwrap(),
+            bs
+        );
+    }
 }
